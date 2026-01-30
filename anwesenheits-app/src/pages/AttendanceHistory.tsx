@@ -70,7 +70,7 @@ export default function AttendanceHistory({ onBack }: AttendanceHistoryProps) {
         setEditedAttendance(new Map())
     }
 
-    const saveEditing = async (trainingId: string) => {
+    const saveEditing = async () => {
         try {
             const updates = Array.from(editedAttendance.entries()).map(([attId, isPresent]) => ({
                 id: attId,
@@ -275,7 +275,7 @@ export default function AttendanceHistory({ onBack }: AttendanceHistoryProps) {
                                                 Abbrechen
                                             </button>
                                             <button
-                                                onClick={() => saveEditing(training.id)}
+                                                onClick={() => saveEditing()}
                                                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
                                             >
                                                 Speichern

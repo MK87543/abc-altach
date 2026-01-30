@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 
@@ -8,7 +8,7 @@ export default function Login({ }: Props) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
-    const { user } = useAuth()
+    const { signIn } = useAuth()
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()

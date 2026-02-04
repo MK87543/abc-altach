@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import NewAttendance from './NewAttendance'
 import AttendanceHistory from './AttendanceHistory'
-import NewPlayer from './NewPlayer'
-import NewCoach from './NewCoach'
-import EditPlayers from './EditPlayers'
-import EditCoaches from './EditCoaches'
+import TrainingPlanner from './TrainingPlanner'
+import ExportAttendance from './ExportAttendance'
+import Statistics from './Statistics'
+import ManageNew from './ManageNew'
+import ManageEdit from './ManageEdit'
+import { MenuIcon, FileTextIcon, ClipboardIcon, CalendarIcon, EditIcon, LogoutIcon, DownloadIcon, ChartIcon, PlusIcon } from '../components/Icons'
 
-type View = 'attendance' | 'history' | 'newPlayer' | 'newCoach' | 'editPlayers' | 'editCoaches'
+type View = 'attendance' | 'history' | 'planner' | 'export' | 'statistics' | 'manageNew' | 'manageEdit'
 
 export default function Dashboard() {
     const [currentView, setCurrentView] = useState<View>('attendance')
@@ -28,7 +30,7 @@ export default function Dashboard() {
                 {/* Overlay to close menu when clicking outside */}
                 {isMenuOpen && (
                     <div
-                        className="fixed inset-0 z-[100]"
+                        className="fixed inset-0 z-[9998]"
                         onClick={() => setIsMenuOpen(false)}
                     />
                 )}
@@ -44,7 +46,7 @@ export default function Dashboard() {
                                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                                 className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center gap-2"
                             >
-                                <span className="text-2xl">☰</span>
+                                <MenuIcon size={24} />
                                 Menü
                             </button>
                         </div>
@@ -54,7 +56,7 @@ export default function Dashboard() {
                 {/* Dropdown Menu - positioned absolutely to viewport */}
                 {isMenuOpen && (
                     <div
-                        className="fixed top-32 right-8 w-56 bg-white rounded-lg shadow-2xl border border-gray-200 z-[110]"
+                        className="fixed top-32 right-8 w-56 bg-white rounded-lg shadow-2xl border border-gray-200 z-[9999]"
                         style={{ maxWidth: 'calc(100vw - 2rem)' }}
                     >
                         <div className="py-2">
@@ -63,7 +65,7 @@ export default function Dashboard() {
                                     onClick={() => navigateTo('attendance')}
                                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition flex items-center gap-3"
                                 >
-                                    <span>📝</span>
+                                    <FileTextIcon />
                                     <span>Neue Anwesenheit</span>
                                 </button>
                             )}
@@ -72,54 +74,62 @@ export default function Dashboard() {
                                     onClick={() => navigateTo('history')}
                                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition flex items-center gap-3"
                                 >
-                                    <span>📋</span>
+                                    <ClipboardIcon />
                                     <span>Historie</span>
                                 </button>
                             )}
-                            {currentView !== 'newPlayer' && (
+                            {currentView !== 'planner' && (
                                 <button
-                                    onClick={() => navigateTo('newPlayer')}
+                                    onClick={() => navigateTo('planner')}
                                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition flex items-center gap-3"
                                 >
-                                    <span>👤</span>
-                                    <span>Neuer Spieler</span>
+                                    <CalendarIcon />
+                                    <span>Trainings planen</span>
                                 </button>
                             )}
-                            {currentView !== 'newCoach' && (
+                            {currentView !== 'export' && (
                                 <button
-                                    onClick={() => navigateTo('newCoach')}
+                                    onClick={() => navigateTo('export')}
                                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition flex items-center gap-3"
                                 >
-                                    <span>👨‍🏫</span>
-                                    <span>Neuer Trainer</span>
+                                    <DownloadIcon />
+                                    <span>Excel Export</span>
                                 </button>
                             )}
-                            <div className="border-t border-gray-200 my-2"></div>
-                            {currentView !== 'editPlayers' && (
+                            {currentView !== 'statistics' && (
                                 <button
-                                    onClick={() => navigateTo('editPlayers')}
+                                    onClick={() => navigateTo('statistics')}
                                     className="w-full text-left px-4 py-3 hover:bg-gray-100 transition flex items-center gap-3"
                                 >
-                                    <span>✏️</span>
-                                    <span>Spieler bearbeiten</span>
-                                </button>
-                            )}
-                            {currentView !== 'editCoaches' && (
-                                <button
-                                    onClick={() => navigateTo('editCoaches')}
-                                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition flex items-center gap-3"
-                                >
-                                    <span>📝</span>
-                                    <span>Trainer bearbeiten</span>
+                                    <ChartIcon />
+                                    <span>Statistik</span>
                                 </button>
                             )}
                             <div className="border-t border-gray-200 my-2"></div>
+                            {currentView !== 'manageNew' && (
+                                <button
+                                    onClick={() => navigateTo('manageNew')}
+                                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition flex items-center gap-3"
+                                >
+                                    <PlusIcon />
+                                    <span>Neu erstellen</span>
+                                </button>
+                            )}
+                            {currentView !== 'manageEdit' && (
+                                <button
+                                    onClick={() => navigateTo('manageEdit')}
+                                    className="w-full text-left px-4 py-3 hover:bg-gray-100 transition flex items-center gap-3"
+                                >
+                                    <EditIcon />
+                                    <span>Daten bearbeiten</span>
+                                </button>
+                            )}
                             <div className="border-t border-gray-200 my-2"></div>
                             <button
                                 onClick={handleLogout}
                                 className="w-full text-left px-4 py-3 hover:bg-red-50 text-red-600 transition flex items-center gap-3"
                             >
-                                <span>🚪</span>
+                                <LogoutIcon />
                                 <span>Logout</span>
                             </button>
                         </div>
@@ -136,27 +146,20 @@ export default function Dashboard() {
                 {currentView === 'history' && (
                     <AttendanceHistory onBack={() => navigateTo('attendance')} />
                 )}
-                {currentView === 'newCoach' && (
-                    <NewCoach
-                        onBack={() => navigateTo('attendance')}
-                        onSuccess={() => {
-                            // Trainer wurde erstellt
-                        }}
-                    />
+                {currentView === 'planner' && (
+                    <TrainingPlanner onBack={() => navigateTo('attendance')} />
                 )}
-                {currentView === 'newPlayer' && (
-                    <NewPlayer
-                        onBack={() => navigateTo('attendance')}
-                        onSuccess={() => {
-                            // Spieler wurde erstellt
-                        }}
-                    />
+                {currentView === 'export' && (
+                    <ExportAttendance onBack={() => navigateTo('attendance')} />
                 )}
-                {currentView === 'editPlayers' && (
-                    <EditPlayers onBack={() => navigateTo('attendance')} />
+                {currentView === 'statistics' && (
+                    <Statistics onBack={() => navigateTo('attendance')} />
                 )}
-                {currentView === 'editCoaches' && (
-                    <EditCoaches onBack={() => navigateTo('attendance')} />
+                {currentView === 'manageNew' && (
+                    <ManageNew onBack={() => navigateTo('attendance')} />
+                )}
+                {currentView === 'manageEdit' && (
+                    <ManageEdit onBack={() => navigateTo('attendance')} />
                 )}
             </div>
         </div>

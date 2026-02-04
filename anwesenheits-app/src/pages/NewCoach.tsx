@@ -4,9 +4,10 @@ import { supabase } from '../lib/supabase'
 interface NewCoachProps {
     onBack: () => void
     onSuccess?: () => void
+    hideHeader?: boolean
 }
 
-export default function NewCoach({ onBack, onSuccess }: NewCoachProps) {
+export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProps) {
     const [name, setName] = useState('')
     const [role, setRole] = useState('Trainer')
     const [loading, setLoading] = useState(false)
@@ -48,16 +49,18 @@ export default function NewCoach({ onBack, onSuccess }: NewCoachProps) {
     }
 
     return (
-        <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Neuer Trainer</h2>
-                <button
-                    onClick={onBack}
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition flex items-center gap-2"
-                >
-                    Zurück
-                </button>
-            </div>
+        <div className={hideHeader ? "" : "bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6"}>
+            {!hideHeader && (
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800">Neuer Trainer</h2>
+                    <button
+                        onClick={onBack}
+                        className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition flex items-center gap-2"
+                    >
+                        Zurück
+                    </button>
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -91,7 +94,7 @@ export default function NewCoach({ onBack, onSuccess }: NewCoachProps) {
 
                 {success && (
                     <div className="p-3 bg-green-100 text-green-700 rounded-lg">
-                        ✓ Trainer erfolgreich erstellt!
+                        Trainer erfolgreich erstellt!
                     </div>
                 )}
 

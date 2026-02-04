@@ -4,9 +4,10 @@ import type { Player } from '../types/interfaces'
 
 interface EditPlayersProps {
     onBack: () => void
+    hideHeader?: boolean
 }
 
-export default function EditPlayers({ onBack }: EditPlayersProps) {
+export default function EditPlayers({ onBack, hideHeader }: EditPlayersProps) {
     const [players, setPlayers] = useState<Player[]>([])
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
@@ -74,16 +75,18 @@ export default function EditPlayers({ onBack }: EditPlayersProps) {
     }
 
     return (
-        <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Spieler bearbeiten</h2>
-                <button
-                    onClick={onBack}
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition flex items-center gap-2"
-                >
-                    Zurück
-                </button>
-            </div>
+        <div className={hideHeader ? "" : "bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6"}>
+            {!hideHeader && (
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800">Spieler bearbeiten</h2>
+                    <button
+                        onClick={onBack}
+                        className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition flex items-center gap-2"
+                    >
+                        Zurück
+                    </button>
+                </div>
+            )}
 
             {players.length === 0 ? (
                 <p className="text-gray-500">Keine Spieler gefunden</p>

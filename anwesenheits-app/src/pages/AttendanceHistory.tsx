@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Training, Attendance, Coach, CoachAttendance } from '../types/interfaces'
-import { EditIcon, TrashIcon } from '../components/Icons'
 
 interface TrainingWithAttendance extends Training {
     attendance: Attendance[]

@@ -10,6 +10,7 @@ interface TrainingPlannerProps {
 interface TrainingWithCoaches extends Training {
     coach_attendance?: {
         coach_id: string
+        is_mandatory: boolean
         coaches: { name: string }
     }[]
 }
@@ -19,10 +20,13 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
     const [coaches, setCoaches] = useState<Coach[]>([])
     const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
     const [newDescription, setNewDescription] = useState('')
-    const [selectedCoachIds, setSelectedCoachIds] = useState<string[]>([])
+    const [selectedMandatoryCoachIds, setSelectedMandatoryCoachIds] = useState<string[]>([])
+    const [selectedAdditionalCoachIds, setSelectedAdditionalCoachIds] = useState<string[]>([])
     const [loading, setLoading] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editDescription, setEditDescription] = useState('')
+    const [editMandatoryCoachIds, setEditMandatoryCoachIds] = useState<string[]>([])
+    const [editAdditionalCoachIds, setEditAdditionalCoachIds] = useState<string[]>([])
 
     useEffect(() => {
         loadData()
@@ -55,6 +59,7 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
                 *,
                 coach_attendance (
                     coach_id,
+                    is_mandatory,
                     coaches ( name )
                 )
             `)
@@ -68,8 +73,16 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
         }
     }
 
-    function toggleCoachSelection(coachId: string) {
-        setSelectedCoachIds(prev =>
+    function toggleMandatoryCoach(coachId: string) {
+        setSelectedMandatoryCoachIds(prev => {
+            if (prev.includes(coachId)) return prev.filter(id => id !== coachId)
+            if (prev.length >= 2) return prev // Max 2
+            return [...prev, coachId]
+        })
+    }
+
+    function toggleAdditionalCoach(coachId: string) {
+        setSelectedAdditionalCoachIds(prev =>
             prev.includes(coachId)
                 ? prev.filter(id => id !== coachId)
                 : [...prev, coachId]
@@ -102,31 +115,41 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
         }
 
         // 2. Trainer zuweisen (falls ausgewählt)
-        if (selectedCoachIds.length > 0 && trainingData) {
-            const coachInserts = selectedCoachIds.map(coachId => ({
+        const allCoachInserts = [
+            ...selectedMandatoryCoachIds.map(coachId => ({
                 training_id: trainingData.id,
                 coach_id: coachId,
-                is_present: true
+                is_present: true,
+                is_mandatory: true
+            })),
+            ...selectedAdditionalCoachIds.map(coachId => ({
+                training_id: trainingData.id,
+                coach_id: coachId,
+                is_present: true,
+                is_mandatory: false
             }))
+        ]
 
+        if (allCoachInserts.length > 0 && trainingData) {
             const { error: coachError } = await supabase
                 .from('coach_attendance')
-                .insert(coachInserts)
+                .insert(allCoachInserts)
 
             if (coachError) {
                 console.error('Fehler beim Trainer zuweisen:', coachError)
-                // Wir machen weiter, auch wenn das fehlschlägt (Training ist ja da)
             }
         }
 
         setNewDate(new Date().toISOString().split('T')[0])
         setNewDescription('')
-        setSelectedCoachIds([])
+        setSelectedMandatoryCoachIds([])
+        setSelectedAdditionalCoachIds([])
         await loadTrainings()
         setLoading(false)
     }
 
     async function updateTraining(id: string) {
+        // 1. Beschreibung aktualisieren
         const { error } = await supabase
             .from('trainings')
             .update({ description: editDescription || null })
@@ -134,10 +157,35 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
 
         if (error) {
             alert('Fehler beim Aktualisieren: ' + error.message)
-        } else {
-            setEditingId(null)
-            await loadTrainings()
+            return
         }
+
+        // 2. Trainer: alte Einträge löschen, neue speichern
+        await supabase.from('coach_attendance').delete().eq('training_id', id)
+
+        const allCoachInserts = [
+            ...editMandatoryCoachIds.map(coachId => ({
+                training_id: id,
+                coach_id: coachId,
+                is_present: true,
+                is_mandatory: true
+            })),
+            ...editAdditionalCoachIds.map(coachId => ({
+                training_id: id,
+                coach_id: coachId,
+                is_present: true,
+                is_mandatory: false
+            }))
+        ]
+
+        if (allCoachInserts.length > 0) {
+            await supabase.from('coach_attendance').insert(allCoachInserts)
+        }
+
+        setEditingId(null)
+        setEditMandatoryCoachIds([])
+        setEditAdditionalCoachIds([])
+        await loadTrainings()
     }
 
     async function deleteTraining(id: string) {
@@ -253,24 +301,80 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
                         <label className="block text-gray-700 font-medium mb-2">
                             Trainer (optional)
                         </label>
-                        <div className="flex flex-wrap gap-2">
-                            {coaches.map(coach => {
-                                const isSelected = selectedCoachIds.includes(coach.id)
-                                return (
-                                    <button
-                                        key={coach.id}
-                                        onClick={() => toggleCoachSelection(coach.id)}
-                                        className={`px-3 py-2 rounded-full border transition flex items-center gap-2 ${isSelected
-                                                ? 'bg-blue-100 border-blue-500 text-blue-700'
-                                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        <UserIcon size={16} />
-                                        {coach.name}
-                                        {isSelected && <CheckIcon size={14} />}
-                                    </button>
-                                )
-                            })}
+
+                        {/* Pflichttrainer */}
+                        <div className="mb-3">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-semibold text-blue-700">Pflichttrainer</span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${selectedMandatoryCoachIds.length >= 2
+                                        ? 'bg-orange-100 text-orange-700'
+                                        : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                    {selectedMandatoryCoachIds.length}/2
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {coaches.map(coach => {
+                                    const isSelected = selectedMandatoryCoachIds.includes(coach.id)
+                                    const isAlreadyAdditional = selectedAdditionalCoachIds.includes(coach.id)
+                                    const isDisabled = isAlreadyAdditional || (!isSelected && selectedMandatoryCoachIds.length >= 2)
+                                    return (
+                                        <button
+                                            key={coach.id}
+                                            onClick={() => !isDisabled && toggleMandatoryCoach(coach.id)}
+                                            disabled={isDisabled}
+                                            className={`px-3 py-2 rounded-full border transition flex items-center gap-2 ${isDisabled
+                                                    ? 'opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
+                                                    : isSelected
+                                                        ? 'bg-blue-100 border-blue-500 text-blue-700'
+                                                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <UserIcon size={16} />
+                                            {coach.name}
+                                            {isSelected && <CheckIcon size={14} />}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                            {selectedMandatoryCoachIds.length >= 2 && (
+                                <p className="text-orange-600 text-xs mt-1">Maximale Anzahl von 2 Pflichttrainern erreicht</p>
+                            )}
+                        </div>
+
+                        {/* Zusatztrainer */}
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-sm font-semibold text-green-700">Zusatztrainer</span>
+                                {selectedAdditionalCoachIds.length > 0 && (
+                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                        {selectedAdditionalCoachIds.length} ausgewählt
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {coaches.map(coach => {
+                                    const isSelected = selectedAdditionalCoachIds.includes(coach.id)
+                                    const isAlreadyMandatory = selectedMandatoryCoachIds.includes(coach.id)
+                                    return (
+                                        <button
+                                            key={coach.id}
+                                            onClick={() => !isAlreadyMandatory && toggleAdditionalCoach(coach.id)}
+                                            disabled={isAlreadyMandatory}
+                                            className={`px-3 py-2 rounded-full border transition flex items-center gap-2 ${isAlreadyMandatory
+                                                    ? 'opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
+                                                    : isSelected
+                                                        ? 'bg-green-100 border-green-500 text-green-700'
+                                                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <UserIcon size={16} />
+                                            {coach.name}
+                                            {isSelected && <CheckIcon size={14} />}
+                                        </button>
+                                    )
+                                })}
+                            </div>
                         </div>
                     </div>
 
@@ -324,24 +428,120 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
                                             </p>
 
                                             {isEditing ? (
-                                                <input
-                                                    type="text"
-                                                    value={editDescription}
-                                                    onChange={(e) => setEditDescription(e.target.value)}
-                                                    placeholder="Beschreibung..."
-                                                    className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                />
+                                                <div className="mt-2 space-y-3">
+                                                    <input
+                                                        type="text"
+                                                        value={editDescription}
+                                                        onChange={(e) => setEditDescription(e.target.value)}
+                                                        placeholder="Beschreibung..."
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+
+                                                    {/* Pflichttrainer bearbeiten */}
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className="text-sm font-semibold text-blue-700">Pflichttrainer</span>
+                                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${editMandatoryCoachIds.length >= 2 ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                                                                }`}>{editMandatoryCoachIds.length}/2</span>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {coaches.map(coach => {
+                                                                const isSelected = editMandatoryCoachIds.includes(coach.id)
+                                                                const isAlreadyAdditional = editAdditionalCoachIds.includes(coach.id)
+                                                                const isDisabled = isAlreadyAdditional || (!isSelected && editMandatoryCoachIds.length >= 2)
+                                                                return (
+                                                                    <button
+                                                                        key={coach.id}
+                                                                        type="button"
+                                                                        disabled={isDisabled}
+                                                                        onClick={() => {
+                                                                            if (isDisabled) return
+                                                                            setEditMandatoryCoachIds(prev =>
+                                                                                prev.includes(coach.id)
+                                                                                    ? prev.filter(id => id !== coach.id)
+                                                                                    : [...prev, coach.id]
+                                                                            )
+                                                                        }}
+                                                                        className={`px-2 py-1 rounded-full border text-xs transition flex items-center gap-1 ${isDisabled
+                                                                                ? 'opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
+                                                                                : isSelected
+                                                                                    ? 'bg-blue-100 border-blue-500 text-blue-700'
+                                                                                    : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                                                            }`}
+                                                                    >
+                                                                        <UserIcon size={12} />{coach.name}{isSelected && <CheckIcon size={11} />}
+                                                                    </button>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Zusatztrainer bearbeiten */}
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <span className="text-sm font-semibold text-green-700">Zusatztrainer</span>
+                                                            {editAdditionalCoachIds.length > 0 && (
+                                                                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                                                    {editAdditionalCoachIds.length} ausgewählt
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {coaches.map(coach => {
+                                                                const isSelected = editAdditionalCoachIds.includes(coach.id)
+                                                                const isAlreadyMandatory = editMandatoryCoachIds.includes(coach.id)
+                                                                return (
+                                                                    <button
+                                                                        key={coach.id}
+                                                                        type="button"
+                                                                        disabled={isAlreadyMandatory}
+                                                                        onClick={() => {
+                                                                            if (isAlreadyMandatory) return
+                                                                            setEditAdditionalCoachIds(prev =>
+                                                                                prev.includes(coach.id)
+                                                                                    ? prev.filter(id => id !== coach.id)
+                                                                                    : [...prev, coach.id]
+                                                                            )
+                                                                        }}
+                                                                        className={`px-2 py-1 rounded-full border text-xs transition flex items-center gap-1 ${isAlreadyMandatory
+                                                                                ? 'opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400'
+                                                                                : isSelected
+                                                                                    ? 'bg-green-100 border-green-500 text-green-700'
+                                                                                    : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                                                            }`}
+                                                                    >
+                                                                        <UserIcon size={12} />{coach.name}{isSelected && <CheckIcon size={11} />}
+                                                                    </button>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <>
                                                     <p className="text-gray-600 mt-1">
                                                         {training.description || <span className="italic text-gray-400">Keine Beschreibung</span>}
                                                     </p>
                                                     {training.coach_attendance && training.coach_attendance.length > 0 && (
-                                                        <div className="mt-2 flex items-center gap-2 text-sm text-blue-700 font-medium">
-                                                            <UserIcon size={14} />
-                                                            <span>
-                                                                Trainer: {training.coach_attendance.map(ca => ca.coaches?.name).join(', ')}
-                                                            </span>
+                                                        <div className="mt-2 space-y-1">
+                                                            {training.coach_attendance.some(ca => ca.is_mandatory) && (
+                                                                <div className="flex items-center gap-2 text-sm">
+                                                                    <UserIcon size={14} className="text-blue-600" />
+                                                                    <span className="text-xs font-semibold text-blue-600 uppercase">Pflicht:</span>
+                                                                    <span className="text-blue-700">
+                                                                        {training.coach_attendance.filter(ca => ca.is_mandatory).map(ca => ca.coaches?.name).join(', ')}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            {training.coach_attendance.some(ca => !ca.is_mandatory) && (
+                                                                <div className="flex items-center gap-2 text-sm">
+                                                                    <UserIcon size={14} className="text-green-600" />
+                                                                    <span className="text-xs font-semibold text-green-600 uppercase">Zusatz:</span>
+                                                                    <span className="text-green-700">
+                                                                        {training.coach_attendance.filter(ca => !ca.is_mandatory).map(ca => ca.coaches?.name).join(', ')}
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </>
@@ -358,7 +558,11 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
                                                         <CheckIcon size={16} />
                                                     </button>
                                                     <button
-                                                        onClick={() => setEditingId(null)}
+                                                        onClick={() => {
+                                                            setEditingId(null)
+                                                            setEditMandatoryCoachIds([])
+                                                            setEditAdditionalCoachIds([])
+                                                        }}
                                                         className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition text-sm flex items-center gap-1"
                                                     >
                                                         <XIcon size={16} />
@@ -370,6 +574,16 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
                                                         onClick={() => {
                                                             setEditingId(training.id)
                                                             setEditDescription(training.description || '')
+                                                            setEditMandatoryCoachIds(
+                                                                training.coach_attendance
+                                                                    ?.filter(ca => ca.is_mandatory)
+                                                                    .map(ca => ca.coach_id) ?? []
+                                                            )
+                                                            setEditAdditionalCoachIds(
+                                                                training.coach_attendance
+                                                                    ?.filter(ca => !ca.is_mandatory)
+                                                                    .map(ca => ca.coach_id) ?? []
+                                                            )
                                                         }}
                                                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition text-sm flex items-center gap-1"
                                                         title="Bearbeiten"

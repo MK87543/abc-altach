@@ -34,5 +34,6 @@ export interface CoachAttendance {
     training_id: string;
     coach_id: string;
     is_present: boolean;
+    is_mandatory: boolean;
     coaches?: Coach;
 }

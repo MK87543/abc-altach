@@ -12,8 +12,8 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
     const [players, setPlayers] = useState<Player[]>([])
     const [coaches, setCoaches] = useState<Coach[]>([])
     const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set())
-    const [selectedCoaches, setSelectedCoaches] = useState<Set<string>>(new Set())
-    const [isCoachDropdownOpen, setIsCoachDropdownOpen] = useState(false)
+    const [selectedMandatoryCoaches, setSelectedMandatoryCoaches] = useState<Set<string>>(new Set())
+    const [selectedAdditionalCoaches, setSelectedAdditionalCoaches] = useState<Set<string>>(new Set())
     const [description, setDescription] = useState('')
     const [loading, setLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
@@ -72,13 +72,21 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
         // Lade Trainer-Anwesenheit
         const { data: coachAttendance } = await supabase
             .from('coach_attendance')
-            .select('coach_id')
+            .select('coach_id, is_mandatory')
             .eq('training_id', trainingId)
             .eq('is_present', true)
 
         if (coachAttendance && coachAttendance.length > 0) {
-            const coachIds = coachAttendance.map(a => a.coach_id).filter(Boolean)
-            setSelectedCoaches(new Set(coachIds))
+            const mandatoryIds = coachAttendance
+                .filter((a: any) => a.is_mandatory)
+                .map((a: any) => a.coach_id)
+                .filter(Boolean)
+            const additionalIds = coachAttendance
+                .filter((a: any) => !a.is_mandatory)
+                .map((a: any) => a.coach_id)
+                .filter(Boolean)
+            setSelectedMandatoryCoaches(new Set(mandatoryIds))
+            setSelectedAdditionalCoaches(new Set(additionalIds))
         }
     }
 
@@ -110,8 +118,21 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
         }
     }
 
-    const toggleCoachSelection = (coachId: string) => {
-        setSelectedCoaches(prev => {
+    const toggleMandatoryCoach = (coachId: string) => {
+        setSelectedMandatoryCoaches(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(coachId)) {
+                newSet.delete(coachId)
+            } else {
+                if (newSet.size >= 2) return prev // Max 2 Pflichttrainer
+                newSet.add(coachId)
+            }
+            return newSet
+        })
+    }
+
+    const toggleAdditionalCoach = (coachId: string) => {
+        setSelectedAdditionalCoaches(prev => {
             const newSet = new Set(prev)
             if (newSet.has(coachId)) {
                 newSet.delete(coachId)
@@ -171,7 +192,8 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
             return
         }
 
-        if (selectedPlayers.size === 0 && selectedCoaches.size === 0) {
+        const totalCoaches = selectedMandatoryCoaches.size + selectedAdditionalCoaches.size
+        if (selectedPlayers.size === 0 && totalCoaches === 0) {
             if (!confirm('Keine Spieler oder Trainer ausgewählt. Wirklich speichern (= alle abwesend)?')) {
                 return
             }
@@ -208,16 +230,25 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
             }
 
             // 4. Speichere neue Trainer-Anwesenheit
-            if (selectedCoaches.size > 0) {
-                const coachAttendanceData = Array.from(selectedCoaches).map(coachId => ({
+            const allCoachAttendanceData = [
+                ...Array.from(selectedMandatoryCoaches).map(coachId => ({
                     training_id: todaysTraining.id,
                     coach_id: coachId,
-                    is_present: true
+                    is_present: true,
+                    is_mandatory: true
+                })),
+                ...Array.from(selectedAdditionalCoaches).map(coachId => ({
+                    training_id: todaysTraining.id,
+                    coach_id: coachId,
+                    is_present: true,
+                    is_mandatory: false
                 }))
+            ]
 
+            if (allCoachAttendanceData.length > 0) {
                 const { error: coachError } = await supabase
                     .from('coach_attendance')
-                    .insert(coachAttendanceData)
+                    .insert(allCoachAttendanceData)
 
                 if (coachError) throw coachError
             }
@@ -323,63 +354,118 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
             </div>
 
             {/* Trainer Auswahl */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6 mb-6 relative z-50">
-                <label className="block text-gray-700 font-medium mb-2">
-                    Trainer
-                </label>
+            <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6 mb-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Trainer</h2>
 
-                {/* Close dropdown overlay */}
-                {isCoachDropdownOpen && (
-                    <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setIsCoachDropdownOpen(false)}
-                    />
-                )}
-
-                <button
-                    type="button"
-                    onClick={() => setIsCoachDropdownOpen(!isCoachDropdownOpen)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-left flex justify-between items-center hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <span className="text-gray-700">
-                        {selectedCoaches.size === 0
-                            ? 'Trainer auswählen...'
-                            : `${selectedCoaches.size} Trainer ausgewählt`
-                        }
-                    </span>
-                    <span className="text-gray-400">▼</span>
-                </button>
-
-                {/* Dropdown Menu */}
-                {isCoachDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-300 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                {/* Pflichttrainer */}
+                <div className="mb-5">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-700 font-medium">Pflichttrainer</span>
+                        <span className={`text-sm font-semibold px-2 py-0.5 rounded-full ${selectedMandatoryCoaches.size >= 2
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                            {selectedMandatoryCoaches.size}/2
+                        </span>
+                    </div>
+                    <div className="space-y-2 border border-gray-200 rounded-lg p-3 bg-gray-50">
                         {coaches.length === 0 ? (
-                            <div className="px-4 py-3 text-gray-500">Keine Trainer gefunden</div>
+                            <p className="text-gray-500 text-sm py-1">Keine Trainer gefunden</p>
                         ) : (
-                            <div className="py-2">
-                                {coaches.map(coach => (
+                            coaches.map(coach => {
+                                const isSelected = selectedMandatoryCoaches.has(coach.id)
+                                const isAlreadyAdditional = selectedAdditionalCoaches.has(coach.id)
+                                const isDisabled = isAlreadyAdditional || (!isSelected && selectedMandatoryCoaches.size >= 2)
+                                return (
                                     <label
                                         key={coach.id}
-                                        className="flex items-center px-4 py-3 hover:bg-gray-100 cursor-pointer"
+                                        className={`flex items-center gap-3 p-3 rounded-lg transition ${isAlreadyAdditional
+                                                ? 'opacity-40 cursor-not-allowed bg-gray-100 border-2 border-gray-200'
+                                                : isDisabled
+                                                    ? 'opacity-40 cursor-not-allowed bg-gray-100 border-2 border-gray-200'
+                                                    : isSelected
+                                                        ? 'bg-blue-50 border-2 border-blue-400 cursor-pointer'
+                                                        : 'bg-white border-2 border-gray-200 hover:bg-gray-50 cursor-pointer'
+                                            }`}
                                     >
                                         <input
                                             type="checkbox"
-                                            checked={selectedCoaches.has(coach.id)}
-                                            onChange={() => toggleCoachSelection(coach.id)}
-                                            className="w-5 h-5 text-blue-500 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                            checked={isSelected}
+                                            disabled={isDisabled}
+                                            onChange={() => toggleMandatoryCoach(coach.id)}
+                                            className="w-5 h-5 cursor-pointer disabled:cursor-not-allowed"
                                         />
-                                        <span className="ml-3 text-gray-700">
+                                        <span className="text-gray-800 flex-1">
                                             {coach.name}
                                             {coach.role && (
                                                 <span className="text-sm text-gray-500 ml-2">({coach.role})</span>
                                             )}
                                         </span>
+                                        {isSelected && (
+                                            <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Pflicht</span>
+                                        )}
                                     </label>
-                                ))}
-                            </div>
+                                )
+                            })
                         )}
                     </div>
-                )}
+                    {selectedMandatoryCoaches.size >= 2 && (
+                        <p className="text-orange-600 text-sm mt-1 flex items-center gap-1">
+                            <WarningIcon size={14} />
+                            Maximale Anzahl von 2 Pflichttrainern erreicht
+                        </p>
+                    )}
+                </div>
+
+                {/* Zusatztrainer */}
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-700 font-medium">Zusatztrainer</span>
+                        {selectedAdditionalCoaches.size > 0 && (
+                            <span className="text-sm font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                {selectedAdditionalCoaches.size} ausgewählt
+                            </span>
+                        )}
+                    </div>
+                    <div className="space-y-2 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                        {coaches.length === 0 ? (
+                            <p className="text-gray-500 text-sm py-1">Keine Trainer gefunden</p>
+                        ) : (
+                            coaches.map(coach => {
+                                const isSelected = selectedAdditionalCoaches.has(coach.id)
+                                const isAlreadyMandatory = selectedMandatoryCoaches.has(coach.id)
+                                return (
+                                    <label
+                                        key={coach.id}
+                                        className={`flex items-center gap-3 p-3 rounded-lg transition ${isAlreadyMandatory
+                                                ? 'opacity-40 cursor-not-allowed bg-gray-100 border-2 border-gray-200'
+                                                : isSelected
+                                                    ? 'bg-green-50 border-2 border-green-400 cursor-pointer'
+                                                    : 'bg-white border-2 border-gray-200 hover:bg-gray-50 cursor-pointer'
+                                            }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            disabled={isAlreadyMandatory}
+                                            onChange={() => toggleAdditionalCoach(coach.id)}
+                                            className="w-5 h-5 cursor-pointer disabled:cursor-not-allowed"
+                                        />
+                                        <span className="text-gray-800 flex-1">
+                                            {coach.name}
+                                            {coach.role && (
+                                                <span className="text-sm text-gray-500 ml-2">({coach.role})</span>
+                                            )}
+                                        </span>
+                                        {isSelected && (
+                                            <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Zusatz</span>
+                                        )}
+                                    </label>
+                                )
+                            })
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Schnell-Buttons */}

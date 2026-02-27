@@ -210,16 +210,42 @@ export default function AttendanceHistory({ onBack }: AttendanceHistoryProps) {
                                         {training.coach_attendance && training.coach_attendance.length > 0 && (
                                             <div className="mb-4 pb-3 border-b border-gray-200">
                                                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Trainer:</h4>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {training.coach_attendance.map(ca => (
-                                                        <span key={ca.id} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm">
-                                                            {ca.coaches?.name || 'Unbekannt'}
-                                                            {ca.coaches?.role && (
-                                                                <span className="text-xs ml-1">({ca.coaches.role})</span>
-                                                            )}
-                                                        </span>
-                                                    ))}
-                                                </div>
+                                                {/* Pflichttrainer */}
+                                                {training.coach_attendance.some(ca => ca.is_mandatory) && (
+                                                    <div className="mb-2">
+                                                        <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Pflichttrainer</span>
+                                                        <div className="flex flex-wrap gap-2 mt-1">
+                                                            {training.coach_attendance
+                                                                .filter(ca => ca.is_mandatory)
+                                                                .map(ca => (
+                                                                    <span key={ca.id} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium">
+                                                                        {ca.coaches?.name || 'Unbekannt'}
+                                                                        {ca.coaches?.role && (
+                                                                            <span className="text-xs ml-1 opacity-75">({ca.coaches.role})</span>
+                                                                        )}
+                                                                    </span>
+                                                                ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {/* Zusatztrainer */}
+                                                {training.coach_attendance.some(ca => !ca.is_mandatory) && (
+                                                    <div>
+                                                        <span className="text-xs font-semibold text-green-600 uppercase tracking-wide">Zusatztrainer</span>
+                                                        <div className="flex flex-wrap gap-2 mt-1">
+                                                            {training.coach_attendance
+                                                                .filter(ca => !ca.is_mandatory)
+                                                                .map(ca => (
+                                                                    <span key={ca.id} className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm">
+                                                                        {ca.coaches?.name || 'Unbekannt'}
+                                                                        {ca.coaches?.role && (
+                                                                            <span className="text-xs ml-1 opacity-75">({ca.coaches.role})</span>
+                                                                        )}
+                                                                    </span>
+                                                                ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         <h4 className="text-sm font-semibold text-gray-700 mb-2">Spieler:</h4>

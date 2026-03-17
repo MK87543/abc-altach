@@ -8,7 +8,7 @@ interface TrainingWithAttendance extends Training {
 }
 
 interface AttendanceHistoryProps {
-    onBack: () => void
+    onBack?: () => void
 }
 
 export default function AttendanceHistory({ onBack }: AttendanceHistoryProps) {
@@ -132,12 +132,6 @@ export default function AttendanceHistory({ onBack }: AttendanceHistoryProps) {
         <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-800">Vergangene Trainings</h2>
-                <button
-                    onClick={onBack}
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition flex items-center gap-2"
-                >
-                    Zurück
-                </button>
             </div>
 
             {/* Date Search */}

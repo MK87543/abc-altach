@@ -1,9 +1,19 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import * as XLSX from 'xlsx'
+import * as ExcelJS from 'exceljs'
+import type { Attendance, Coach, CoachAttendance, Player, Training } from '../types/interfaces'
 
 interface ExportAttendanceProps {
     onBack?: () => void
+}
+
+type TrainingWithAttendance = Training & {
+    attendance?: Array<Pick<Attendance, 'player_id' | 'is_present'>>
+    coach_attendance?: Array<Pick<CoachAttendance, 'is_present'> & { coaches?: Pick<Coach, 'name'> | null }>
+}
+
+type NavigatorWithMsSaveBlob = Navigator & {
+    msSaveBlob?: (blob: Blob, filename?: string) => void
 }
 
 export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
@@ -50,8 +60,8 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
             if (playersResponse.error) throw playersResponse.error
             if (trainingsResponse.error) throw trainingsResponse.error
 
-            const players = playersResponse.data || []
-            const trainings = trainingsResponse.data || []
+            const players = (playersResponse.data || []) as Array<Pick<Player, 'id' | 'name'>>
+            const trainings = (trainingsResponse.data || []) as TrainingWithAttendance[]
 
             if (trainings.length === 0) {
                 alert('Keine Trainings im ausgewählten Zeitraum gefunden')
@@ -60,7 +70,7 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
             }
 
             // --- BLATT 1: ANWESENHEITSLISTE ---
-            const attendanceData: any[][] = []
+            const attendanceData: Array<Array<string | number>> = []
 
             // Titel und Metadaten
             attendanceData.push(['ANWESENHEITSLISTE ABC ALTACH'])
@@ -80,16 +90,17 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
                 const description = training.description || '-'
 
                 const coaches = training.coach_attendance
-                    ?.filter((ca: any) => ca.is_present && ca.coaches?.name)
-                    .map((ca: any) => ca.coaches.name)
+                    ?.filter((ca) => ca.is_present && ca.coaches?.name)
+                    .map((ca) => ca.coaches?.name)
+                    .filter((name): name is string => Boolean(name))
                     .join(', ') || '-'
 
-                const row = [dateStr, weekday, description, coaches]
+                const row: Array<string | number> = [dateStr, weekday, description, coaches]
 
                 // Checkmarks für jeden Spieler
                 players.forEach(player => {
                     const isPresent = training.attendance?.some(
-                        (att: any) => att.player_id === player.id && att.is_present
+                        (att) => att.player_id === player.id && att.is_present
                     )
                     row.push(isPresent ? 'X' : '')
                 })
@@ -98,7 +109,7 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
             })
 
             // --- BLATT 2: STATISTIK ---
-            const statsData: any[][] = []
+            const statsData: Array<Array<string | number>> = []
             statsData.push(['TRAININGS-STATISTIK'])
             statsData.push([`Gesamtanzahl Trainings: ${trainings.length}`])
             statsData.push([''])
@@ -108,7 +119,7 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
             const stats = players.map(player => {
                 const attendedCount = trainings.reduce((count, training) => {
                     const isPresent = training.attendance?.some(
-                        (att: any) => att.player_id === player.id && att.is_present
+                        (att) => att.player_id === player.id && att.is_present
                     )
                     return count + (isPresent ? 1 : 0)
                 }, 0)
@@ -128,40 +139,41 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
             })
 
             // --- EXCEL ERSTELLEN ---
-            const wb = XLSX.utils.book_new()
+            const wb = new ExcelJS.Workbook()
 
             // Blatt 1 hinzufügen
-            const wsAttendance = XLSX.utils.aoa_to_sheet(attendanceData)
+            const wsAttendance = wb.addWorksheet('Übersicht')
+            wsAttendance.addRows(attendanceData)
 
             // Spaltenbreiten Blatt 1
-            wsAttendance['!cols'] = [
-                { wch: 12 }, // Datum
-                { wch: 12 }, // Wochentag
-                { wch: 25 }, // Beschreibung
-                { wch: 20 }, // Trainer
-                ...players.map(() => ({ wch: 4 })) // Spieler schmal
+            wsAttendance.columns = [
+                { width: 12 }, // Datum
+                { width: 12 }, // Wochentag
+                { width: 25 }, // Beschreibung
+                { width: 20 }, // Trainer
+                ...players.map(() => ({ width: 4 })) // Spieler schmal
             ]
-            XLSX.utils.book_append_sheet(wb, wsAttendance, 'Übersicht')
 
             // Blatt 2 hinzufügen
-            const wsStats = XLSX.utils.aoa_to_sheet(statsData)
-            wsStats['!cols'] = [
-                { wch: 20 }, // Name
-                { wch: 10 }, // Anwesend
-                { wch: 10 }  // Quote
+            const wsStats = wb.addWorksheet('Statistik')
+            wsStats.addRows(statsData)
+            wsStats.columns = [
+                { width: 20 }, // Name
+                { width: 10 }, // Anwesend
+                { width: 10 }  // Quote
             ]
-            XLSX.utils.book_append_sheet(wb, wsStats, 'Statistik')
 
             // --- DOWNLOAD ---
             const filename = `Anwesenheit_${startDate}_bis_${endDate}.xlsx`
 
             // Blob erstellen
-            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+            const wbout = await wb.xlsx.writeBuffer()
             const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
 
             // Download Logik für Mobile/Desktop
-            if (typeof (window.navigator as any).msSaveBlob !== 'undefined') {
-                (window.navigator as any).msSaveBlob(blob, filename)
+            const navigator = window.navigator as NavigatorWithMsSaveBlob
+            if (typeof navigator.msSaveBlob !== 'undefined') {
+                navigator.msSaveBlob(blob, filename)
             } else {
                 const url = window.URL.createObjectURL(blob)
                 const link = document.createElement('a')

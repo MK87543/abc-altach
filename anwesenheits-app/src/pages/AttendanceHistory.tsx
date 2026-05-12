@@ -7,11 +7,7 @@ interface TrainingWithAttendance extends Training {
     coach_attendance: (CoachAttendance & { coaches: Coach | null })[]
 }
 
-interface AttendanceHistoryProps {
-    onBack?: () => void
-}
-
-export default function AttendanceHistory({ onBack }: AttendanceHistoryProps) {
+export default function AttendanceHistory() {
     const [pastTrainings, setPastTrainings] = useState<TrainingWithAttendance[]>([])
     const [editingTrainingId, setEditingTrainingId] = useState<string | null>(null)
     const [editedAttendance, setEditedAttendance] = useState<Map<string, boolean>>(new Map())

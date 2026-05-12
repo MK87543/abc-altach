@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import { supabase } from '../lib/supabase'
 import NewAttendance from './NewAttendance'
 import AttendanceHistory from './AttendanceHistory'
@@ -25,7 +25,7 @@ export default function Dashboard() {
     }
 
     // Die 5 Haupt-Tabs für die untere Navigationsleiste
-    const mainTabs: { view: View; label: string; icon: JSX.Element }[] = [
+    const mainTabs: { view: View; label: string; icon: ReactElement }[] = [
         { view: 'attendance', label: 'Heute', icon: <CheckIcon size={22} /> },
         { view: 'history', label: 'Historie', icon: <ClipboardIcon size={22} /> },
         { view: 'planner', label: 'Planung', icon: <CalendarIcon size={22} /> },

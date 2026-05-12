@@ -27,6 +27,8 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
     const [editDescription, setEditDescription] = useState('')
     const [editMandatoryCoachIds, setEditMandatoryCoachIds] = useState<string[]>([])
     const [editAdditionalCoachIds, setEditAdditionalCoachIds] = useState<string[]>([])
+    const [dragMode, setDragMode] = useState(false)
+    const [dragOverDate, setDragOverDate] = useState<string | null>(null)
 
     useEffect(() => {
         loadData()
@@ -205,6 +207,20 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
 
         if (error) {
             alert('Fehler beim Löschen: ' + error.message)
+        } else {
+            await loadTrainings()
+        }
+    }
+
+    async function updateTrainingDate(id: string, newDate: string) {
+        const { error } = await supabase
+            .from('trainings')
+            .update({ date: newDate })
+            .eq('id', id)
+
+        if (error) {
+            console.error('Fehler beim Verschieben:', error)
+            alert('Fehler beim Verschieben: ' + error.message)
         } else {
             await loadTrainings()
         }
@@ -395,10 +411,19 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
 
             {/* Geplante Trainings */}
             <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <ClipboardIcon size={24} />
-                    Geplante Trainings ({trainings.length})
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <ClipboardIcon size={24} />
+                        Geplante Trainings ({trainings.length})
+                    </h2>
+
+                    <div className="flex items-center gap-3">
+                        <label className="inline-flex items-center gap-2 text-sm">
+                            <input type="checkbox" checked={dragMode} onChange={e => setDragMode(e.target.checked)} className="form-checkbox" />
+                            <span>Testmodus: Drag & Drop</span>
+                        </label>
+                    </div>
+                </div>
 
                 {trainings.length === 0 ? (
                     <p className="text-gray-500 text-center py-8">
@@ -406,7 +431,46 @@ export default function TrainingPlanner({ onBack }: TrainingPlannerProps) {
                     </p>
                 ) : (
                     <div className="space-y-3">
-                        {trainings.map(training => {
+                        {dragMode ? (
+                            <div className="grid grid-cols-7 gap-3">
+                                {Array.from({ length: 7 }).map((_, idx) => {
+                                    const d = new Date()
+                                    d.setDate(d.getDate() + idx)
+                                    const dateKey = d.toISOString().split('T')[0]
+                                    const dayTrainings = trainings.filter(t => t.date === dateKey)
+
+                                    return (
+                                        <div
+                                            key={dateKey}
+                                            onDragOver={(e) => { e.preventDefault(); setDragOverDate(dateKey) }}
+                                            onDragLeave={() => setDragOverDate(null)}
+                                            onDrop={(e) => {
+                                                e.preventDefault()
+                                                const id = e.dataTransfer.getData('text/plain')
+                                                if (id) updateTrainingDate(id, dateKey)
+                                                setDragOverDate(null)
+                                            }}
+                                            className={`p-2 rounded-lg min-h-[120px] border ${dragOverDate === dateKey ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                                            <div className="text-xs font-semibold mb-2">{d.toLocaleDateString('de-AT', { weekday: 'short', day: '2-digit', month: 'short' })}</div>
+                                            <div className="space-y-2">
+                                                {dayTrainings.map(t => (
+                                                    <div
+                                                        key={t.id}
+                                                        draggable
+                                                        onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)}
+                                                        className="px-2 py-1 bg-white rounded shadow-sm border flex items-center justify-between text-sm"
+                                                    >
+                                                        <div className="truncate">{t.description || 'Keine Beschreibung'}</div>
+                                                        <div className="ml-2 text-xs text-gray-400">⠿</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            trainings.map(training => {
                             const isToday = training.date === new Date().toISOString().split('T')[0]
                             const isEditing = editingId === training.id
                             const dateInfo = formatDateGerman(training.date)

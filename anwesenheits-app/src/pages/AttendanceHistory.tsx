@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Training, Attendance, Coach, CoachAttendance } from '../types/interfaces'
+import { useToast } from '../components/Toast'
+import { useConfirm } from '../components/ConfirmModal'
+import { useUrlQueryParam } from '../lib/urlUtils'
+import { SpinnerIcon } from '../components/Icons'
 
 interface TrainingWithAttendance extends Training {
     attendance: Attendance[]
@@ -8,10 +12,15 @@ interface TrainingWithAttendance extends Training {
 }
 
 export default function AttendanceHistory() {
+    const { toast } = useToast()
+    const { confirm } = useConfirm()
+
     const [pastTrainings, setPastTrainings] = useState<TrainingWithAttendance[]>([])
     const [editingTrainingId, setEditingTrainingId] = useState<string | null>(null)
     const [editedAttendance, setEditedAttendance] = useState<Map<string, boolean>>(new Map())
-    const [searchDate, setSearchDate] = useState('')
+    const [searchDate, setSearchDate] = useUrlQueryParam<string>('histDate', '')
+    const [isSaving, setIsSaving] = useState(false)
+    const [isDeletingId, setIsDeletingId] = useState<string | null>(null)
 
     const formatDateGerman = (dateString: string) => {
         const date = new Date(dateString + 'T00:00:00')
@@ -67,6 +76,7 @@ export default function AttendanceHistory() {
     }
 
     const saveEditing = async () => {
+        setIsSaving(true)
         try {
             const updates = Array.from(editedAttendance.entries()).map(([attId, isPresent]) => ({
                 id: attId,
@@ -85,9 +95,12 @@ export default function AttendanceHistory() {
             await fetchPastTrainings()
             setEditingTrainingId(null)
             setEditedAttendance(new Map())
+            toast.success('Änderungen erfolgreich gespeichert.')
         } catch (error) {
             console.error('Fehler beim Speichern:', error)
-            alert('Fehler beim Speichern der Änderungen')
+            toast.error('Fehler beim Speichern der Änderungen')
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -100,10 +113,18 @@ export default function AttendanceHistory() {
     }
 
     const deleteTraining = async (trainingId: string, trainingDate: string) => {
-        if (!confirm(`Training vom ${formatDateGerman(trainingDate)} wirklich löschen?`)) {
+        const confirmed = await confirm({
+            title: 'Training löschen',
+            message: `Training vom ${formatDateGerman(trainingDate)} wirklich löschen? Alle zugehörigen Anwesenheitsdaten gehen verloren.`,
+            confirmText: 'Löschen',
+            cancelText: 'Abbrechen',
+            isDanger: true,
+        })
+        if (!confirmed) {
             return
         }
 
+        setIsDeletingId(trainingId)
         try {
             // Supabase wird automatisch attendance und coach_attendance löschen (CASCADE)
             const { error } = await supabase
@@ -114,11 +135,15 @@ export default function AttendanceHistory() {
             if (error) throw error
 
             await fetchPastTrainings()
+            toast.success('Training erfolgreich gelöscht.')
         } catch (error) {
             console.error('Fehler beim Löschen:', error)
-            alert('Fehler beim Löschen des Trainings')
+            toast.error('Fehler beim Löschen des Trainings')
+        } finally {
+            setIsDeletingId(null)
         }
     }
+
 
     const filteredTrainings = searchDate
         ? pastTrainings.filter(t => t.date === searchDate)
@@ -183,10 +208,11 @@ export default function AttendanceHistory() {
                                                 </button>
                                                 <button
                                                     onClick={() => deleteTraining(training.id, training.date)}
-                                                    className="text-red-600 hover:text-red-800 px-2"
+                                                    disabled={isDeletingId === training.id}
+                                                    className="text-red-600 hover:text-red-800 px-2 cursor-pointer disabled:opacity-50"
                                                     title="Löschen"
                                                 >
-                                                    🗑️
+                                                    {isDeletingId === training.id ? <SpinnerIcon size={16} /> : '🗑️'}
                                                 </button>
                                             </>
                                         )}
@@ -292,9 +318,11 @@ export default function AttendanceHistory() {
                                             </button>
                                             <button
                                                 onClick={() => saveEditing()}
-                                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                                                disabled={isSaving}
+                                                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer font-medium"
                                             >
-                                                Speichern
+                                                {isSaving && <SpinnerIcon size={16} />}
+                                                <span>{isSaving ? 'Speichert...' : 'Speichern'}</span>
                                             </button>
                                         </div>
                                     )}

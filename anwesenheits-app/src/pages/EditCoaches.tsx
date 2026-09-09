@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Coach } from '../types/interfaces'
+import { useToast } from '../components/Toast'
+import { useConfirm } from '../components/ConfirmModal'
 
 interface EditCoachesProps {
     onBack: () => void
@@ -8,6 +10,9 @@ interface EditCoachesProps {
 }
 
 export default function EditCoaches({ onBack, hideHeader }: EditCoachesProps) {
+    const { toast } = useToast()
+    const { confirm } = useConfirm()
+
     const [coaches, setCoaches] = useState<Coach[]>([])
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
@@ -59,13 +64,25 @@ export default function EditCoaches({ onBack, hideHeader }: EditCoachesProps) {
             setEditingId(null)
             setEditName('')
             setEditRole('')
+            toast.success('Trainerdaten aktualisiert.')
         } catch (error) {
             console.error('Fehler beim Speichern:', error)
-            alert('Fehler beim Speichern')
+            toast.error('Fehler beim Speichern.')
         }
     }
 
     const toggleActive = async (coachId: string, currentActive: boolean) => {
+        if (currentActive) {
+            const confirmed = await confirm({
+                title: 'Trainer deaktivieren',
+                message: 'Möchtest du diesen Trainer wirklich deaktivieren?',
+                confirmText: 'Deaktivieren',
+                cancelText: 'Abbrechen',
+                isDanger: true,
+            })
+            if (!confirmed) return
+        }
+
         try {
             const { error } = await supabase
                 .from('coaches')
@@ -75,11 +92,13 @@ export default function EditCoaches({ onBack, hideHeader }: EditCoachesProps) {
             if (error) throw error
 
             await fetchCoaches()
+            toast.success(currentActive ? 'Trainer deaktiviert.' : 'Trainer aktiviert.')
         } catch (error) {
             console.error('Fehler beim Ändern des Status:', error)
-            alert('Fehler beim Ändern des Status')
+            toast.error('Fehler beim Ändern des Status.')
         }
     }
+
 
     return (
         <div className={hideHeader ? "" : "bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6"}>

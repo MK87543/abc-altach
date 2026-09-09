@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Player, Coach, Training } from '../types/interfaces'
-import { CheckIcon, XIcon, WarningIcon, SaveIcon, LightbulbIcon, EditIcon, ClipboardIcon } from '../components/Icons'
+import { CheckIcon, XIcon, WarningIcon, SaveIcon, LightbulbIcon, EditIcon, ClipboardIcon, SpinnerIcon } from '../components/Icons'
+import { useToast } from '../components/Toast'
+import { useConfirm } from '../components/ConfirmModal'
 
 interface NewAttendanceProps {
     onSuccess?: () => void
 }
 
 export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
+    const { toast } = useToast()
+    const { confirm, prompt } = useConfirm()
+
     const [todaysTraining, setTodaysTraining] = useState<Training | null>(null)
     const [players, setPlayers] = useState<Player[]>([])
     const [coaches, setCoaches] = useState<Coach[]>([])
@@ -16,7 +21,10 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
     const [selectedAdditionalCoaches, setSelectedAdditionalCoaches] = useState<Set<string>>(new Set())
     const [description, setDescription] = useState('')
     const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [spontaneousLoading, setSpontaneousLoading] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
+
 
     const formatDateGerman = (dateString: string) => {
         const date = new Date(dateString + 'T00:00:00')
@@ -163,43 +171,64 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
     }
 
     async function createSpontaneousTraining() {
-        const topic = prompt('Beschreibung für heute (optional):')
-        const today = new Date().toISOString().split('T')[0]
+        const topic = await prompt({
+            title: 'Spontanes Training erstellen',
+            message: 'Beschreibung für heute (optional):',
+            placeholder: 'z. B. Spontanes Spieltraining',
+            confirmText: 'Erstellen',
+            cancelText: 'Abbrechen',
+        })
+        if (topic === null) return
 
-        const { data, error } = await supabase
-            .from('trainings')
-            .insert({
-                date: today,
-                description: topic || 'Spontanes Training'
-            })
-            .select()
-            .single()
+        setSpontaneousLoading(true)
+        try {
+            const today = new Date().toISOString().split('T')[0]
 
-        if (error) {
-            alert('Fehler beim Erstellen: ' + error.message)
-            return
-        }
+            const { data, error } = await supabase
+                .from('trainings')
+                .insert({
+                    date: today,
+                    description: topic.trim() || 'Spontanes Training'
+                })
+                .select()
+                .single()
 
-        if (data) {
-            setTodaysTraining(data)
-            setDescription(data.description || '')
+            if (error) {
+                toast.error('Fehler beim Erstellen: ' + error.message)
+                return
+            }
+
+            if (data) {
+                setTodaysTraining(data)
+                setDescription(data.description || '')
+                toast.success('Spontanes Training erfolgreich erstellt!')
+            }
+        } finally {
+            setSpontaneousLoading(false)
         }
     }
 
     async function saveAttendance() {
         if (!todaysTraining) {
-            alert('Kein Training für heute geplant!')
+            toast.warning('Kein Training für heute geplant!')
             return
         }
 
         const totalCoaches = selectedMandatoryCoaches.size + selectedAdditionalCoaches.size
         if (selectedPlayers.size === 0 && totalCoaches === 0) {
-            if (!confirm('Keine Spieler oder Trainer ausgewählt. Wirklich speichern (= alle abwesend)?')) {
+            const confirmed = await confirm({
+                title: 'Keine Auswahl',
+                message: 'Keine Spieler oder Trainer ausgewählt. Wirklich speichern (= alle abwesend)?',
+                confirmText: 'Trotzdem speichern',
+                cancelText: 'Abbrechen',
+                isDanger: false,
+            })
+            if (!confirmed) {
                 return
             }
         }
 
-        setLoading(true)
+        setSaving(true)
 
         try {
             // 1. Lösche alte Spieler-Anwesenheit für dieses Training
@@ -261,23 +290,24 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
                     .eq('id', todaysTraining.id)
             }
 
-            alert(`Anwesenheit ${isEditing ? 'aktualisiert' : 'gespeichert'}!`)
+            toast.success(`Anwesenheit ${isEditing ? 'aktualisiert' : 'gespeichert'}!`)
 
             if (onSuccess) {
                 onSuccess()
             }
         } catch (error) {
             console.error('Fehler beim Speichern:', error)
-            alert('Fehler beim Speichern der Anwesenheit')
+            toast.error('Fehler beim Speichern der Anwesenheit')
         } finally {
-            setLoading(false)
+            setSaving(false)
         }
     }
 
     if (loading) {
         return (
-            <div className="h-screen flex items-center justify-center">
-                <p className="text-gray-600 text-lg">Lade Training...</p>
+            <div className="p-16 flex flex-col items-center justify-center gap-3">
+                <SpinnerIcon size={32} className="text-blue-600" />
+                <p className="text-gray-600 text-sm font-medium">Lade Training...</p>
             </div>
         )
     }
@@ -302,9 +332,17 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
                     <h3 className="text-gray-800 font-semibold mb-3">Spontanes Training erstellen?</h3>
                     <button
                         onClick={createSpontaneousTraining}
-                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition font-medium"
+                        disabled={spontaneousLoading}
+                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition font-medium flex items-center gap-2 cursor-pointer disabled:opacity-50"
                     >
-                        + Jetzt schnell Training erstellen
+                        {spontaneousLoading ? (
+                            <>
+                                <SpinnerIcon size={18} />
+                                <span>Erstelle Training...</span>
+                            </>
+                        ) : (
+                            <span>+ Jetzt schnell Training erstellen</span>
+                        )}
                     </button>
                 </div>
             </div>
@@ -519,25 +557,25 @@ export default function NewAttendance({ onSuccess }: NewAttendanceProps) {
             {/* Speichern-Button */}
             <button
                 onClick={saveAttendance}
-                disabled={loading}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg transition text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                disabled={saving}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg transition text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
             >
-                {loading
-                    ? 'Wird gespeichert...'
-                    : isEditing
-                        ? (
-                            <>
-                                <SaveIcon size={24} />
-                                Anwesenheit aktualisieren
-                            </>
-                        )
-                        : (
-                            <>
-                                <CheckIcon size={24} />
-                                Anwesenheit speichern
-                            </>
-                        )
-                }
+                {saving ? (
+                    <>
+                        <SpinnerIcon size={24} />
+                        <span>Wird gespeichert...</span>
+                    </>
+                ) : isEditing ? (
+                    <>
+                        <SaveIcon size={24} />
+                        <span>Anwesenheit aktualisieren</span>
+                    </>
+                ) : (
+                    <>
+                        <CheckIcon size={24} />
+                        <span>Anwesenheit speichern</span>
+                    </>
+                )}
             </button>
 
             {/* Info-Hinweis */}

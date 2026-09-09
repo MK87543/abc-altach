@@ -1,5 +1,10 @@
-import { useState, type ReactElement } from 'react'
+import { useState, useEffect, type ReactElement } from 'react'
 import { supabase } from '../lib/supabase'
+import type { Coach } from '../types/interfaces'
+import { useActiveCoach } from '../hooks/useActiveCoach'
+import { useUrlQueryParam } from '../lib/urlUtils'
+import { useConfirm } from '../components/ConfirmModal'
+import { useToast } from '../components/Toast'
 import NewAttendance from './NewAttendance'
 import AttendanceHistory from './AttendanceHistory'
 import TrainingPlanner from './TrainingPlanner'
@@ -7,15 +12,39 @@ import ExportAttendance from './ExportAttendance'
 import Statistics from './Statistics'
 import ManageNew from './ManageNew'
 import ManageEdit from './ManageEdit'
-import { CheckIcon, ClipboardIcon, CalendarIcon, EditIcon, LogoutIcon, DownloadIcon, ChartIcon, PlusIcon, UserIcon } from '../components/Icons'
+import CoachCalendar from './CoachCalendar'
+import { CheckIcon, ClipboardIcon, CalendarIcon, EditIcon, LogoutIcon, DownloadIcon, ChartIcon, PlusIcon, UserIcon, UmbrellaIcon } from '../components/Icons'
 
-type View = 'attendance' | 'history' | 'planner' | 'statistics' | 'verwaltung' | 'manageNew' | 'manageEdit' | 'export'
+type View = 'attendance' | 'history' | 'planner' | 'statistics' | 'verwaltung' | 'manageNew' | 'manageEdit' | 'export' | 'coachCalendar'
 
 export default function Dashboard() {
-    const [currentView, setCurrentView] = useState<View>('attendance')
+    const [currentView, setCurrentView] = useUrlQueryParam<View>('view', 'attendance')
+    const { activeCoachId, setActiveCoach } = useActiveCoach()
+    const [coaches, setCoaches] = useState<Coach[]>([])
+    const { confirm } = useConfirm()
+    const { toast } = useToast()
+
+    useEffect(() => {
+        supabase
+            .from('coaches')
+            .select('*')
+            .eq('active', true)
+            .order('name')
+            .then(({ data }) => {
+                if (data) setCoaches(data)
+            })
+    }, [])
 
     const handleLogout = async () => {
-        if (confirm('Wirklich abmelden?')) {
+        const confirmed = await confirm({
+            title: 'Abmelden',
+            message: 'Möchtest du dich wirklich abmelden?',
+            confirmText: 'Abmelden',
+            cancelText: 'Abbrechen',
+            isDanger: true,
+        })
+        if (confirmed) {
+            toast.info('Erfolgreich abgemeldet.')
             await supabase.auth.signOut()
         }
     }
@@ -23,6 +52,7 @@ export default function Dashboard() {
     const navigateTo = (view: View) => {
         setCurrentView(view)
     }
+
 
     // Die 5 Haupt-Tabs für die untere Navigationsleiste
     const mainTabs: { view: View; label: string; icon: ReactElement }[] = [
@@ -34,7 +64,7 @@ export default function Dashboard() {
     ]
 
     // Welcher Tab ist aktiv? (Unterseiten von Verwaltung zählen auch als "Verwaltung")
-    const activeTab: View = (['manageNew', 'manageEdit', 'export'] as View[]).includes(currentView)
+    const activeTab: View = (['manageNew', 'manageEdit', 'export', 'coachCalendar'] as View[]).includes(currentView)
         ? 'verwaltung'
         : currentView
 
@@ -48,6 +78,7 @@ export default function Dashboard() {
         manageNew: 'Neu hinzufügen',
         manageEdit: 'Bearbeiten',
         export: 'Excel Export',
+        coachCalendar: 'Trainer-Abwesenheitskalender',
     }
 
     return (
@@ -59,13 +90,34 @@ export default function Dashboard() {
                         <p className="text-xs text-gray-400 uppercase tracking-wide font-medium leading-none">ABC Altach</p>
                         <h1 className="text-lg font-bold text-gray-800 leading-tight">{pageTitle[currentView]}</h1>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition text-sm font-medium"
-                    >
-                        <LogoutIcon size={16} />
-                        Abmelden
-                    </button>
+                    
+                    <div className="flex items-center gap-3">
+                        {/* Aktiver Trainer (im Cookie gespeichert) */}
+                        {coaches.length > 0 && (
+                            <div className="hidden sm:flex items-center gap-1.5 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg text-xs" title="Aktiver Trainer (wird im Cookie gespeichert)">
+                                <UserIcon size={14} className="text-blue-600" />
+                                <span className="text-blue-700 font-medium">Trainer:</span>
+                                <select
+                                    value={activeCoachId || ''}
+                                    onChange={(e) => setActiveCoach(e.target.value || null)}
+                                    className="bg-transparent text-blue-900 font-bold focus:outline-none cursor-pointer"
+                                >
+                                    <option value="">(Wählen...)</option>
+                                    {coaches.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition text-sm font-medium"
+                        >
+                            <LogoutIcon size={16} />
+                            Abmelden
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -78,7 +130,7 @@ export default function Dashboard() {
                     <AttendanceHistory />
                 )}
                 {currentView === 'planner' && (
-                    <TrainingPlanner />
+                    <TrainingPlanner onOpenCalendar={() => navigateTo('coachCalendar')} />
                 )}
                 {currentView === 'statistics' && (
                     <Statistics />
@@ -96,6 +148,9 @@ export default function Dashboard() {
                 )}
                 {currentView === 'export' && (
                     <ExportAttendance onBack={() => navigateTo('verwaltung')} />
+                )}
+                {currentView === 'coachCalendar' && (
+                    <CoachCalendar onBack={() => navigateTo('verwaltung')} />
                 )}
             </main>
 
@@ -138,6 +193,14 @@ interface VerwaltungHubProps {
 
 function VerwaltungHub({ onNavigate }: VerwaltungHubProps) {
     const cards = [
+        {
+            view: 'coachCalendar' as View,
+            icon: <UmbrellaIcon size={32} />,
+            title: 'Trainer-Abwesenheiten & Urlaub',
+            description: 'Urlaubszeiten eintragen oder wöchentliche Verhinderungen (z. B. jeden Dienstag)',
+            color: 'bg-indigo-50 border-indigo-200 hover:bg-indigo-100',
+            iconColor: 'text-indigo-600',
+        },
         {
             view: 'manageNew' as View,
             icon: <PlusIcon size={32} />,
@@ -185,3 +248,4 @@ function VerwaltungHub({ onNavigate }: VerwaltungHubProps) {
         </div>
     )
 }
+

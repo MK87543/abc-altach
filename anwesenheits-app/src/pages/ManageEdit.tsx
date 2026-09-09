@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import EditPlayers from './EditPlayers'
 import EditCoaches from './EditCoaches'
 import { EditIcon, UserIcon, CoachIcon } from '../components/Icons'
+import { useUrlQueryParam } from '../lib/urlUtils'
 
 interface ManageEditProps {
     onBack: () => void
@@ -10,7 +10,8 @@ interface ManageEditProps {
 type Tab = 'player' | 'coach'
 
 export default function ManageEdit({ onBack }: ManageEditProps) {
-    const [activeTab, setActiveTab] = useState<Tab>('player')
+    const [activeTab, setActiveTab] = useUrlQueryParam<Tab>('editTab', 'player')
+
 
     return (
         <div className="p-6 max-w-2xl mx-auto">

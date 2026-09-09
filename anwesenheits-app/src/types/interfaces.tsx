@@ -37,3 +37,19 @@ export interface CoachAttendance {
     is_mandatory: boolean;
     coaches?: Coach;
 }
+
+export type AbsenceType = 'single' | 'range' | 'recurring';
+
+export interface CoachAbsence {
+    id: string;
+    coach_id: string;
+    absence_type: AbsenceType;
+    start_date: string; // YYYY-MM-DD
+    end_date?: string | null; // YYYY-MM-DD
+    recurring_day_of_week?: number | null; // 0=So, 1=Mo, 2=Di, 3=Mi, 4=Do, 5=Fr, 6=Sa
+    recurring_days?: number[] | null;
+    recurrence_interval?: number | null; // 1 = jede Woche, 2 = alle 2 Wochen
+    reason?: string | null;
+    created_at?: string;
+    coaches?: Coach;
+}

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/Toast'
+import { SpinnerIcon } from '../components/Icons'
 
 interface NewPlayerProps {
     onBack: () => void
@@ -8,6 +10,7 @@ interface NewPlayerProps {
 }
 
 export default function NewPlayer({ onBack, onSuccess, hideHeader }: NewPlayerProps) {
+    const { toast } = useToast()
     const [name, setName] = useState('')
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
@@ -29,6 +32,7 @@ export default function NewPlayer({ onBack, onSuccess, hideHeader }: NewPlayerPr
 
             setSuccess(true)
             setName('')
+            toast.success('Spieler erfolgreich erstellt!')
 
             if (onSuccess) {
                 onSuccess()
@@ -39,11 +43,12 @@ export default function NewPlayer({ onBack, onSuccess, hideHeader }: NewPlayerPr
             }, 3000)
         } catch (error) {
             console.error('Fehler beim Erstellen des Spielers:', error)
-            alert('Fehler beim Erstellen des Spielers')
+            toast.error('Fehler beim Erstellen des Spielers: ' + (error as Error).message)
         } finally {
             setLoading(false)
         }
     }
+
 
     return (
         <div className={hideHeader ? "" : "bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6"}>
@@ -84,9 +89,16 @@ export default function NewPlayer({ onBack, onSuccess, hideHeader }: NewPlayerPr
                 <button
                     type="submit"
                     disabled={loading || !name.trim()}
-                    className="w-full bg-blue-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
-                    {loading ? 'Wird erstellt...' : 'Spieler erstellen'}
+                    {loading ? (
+                        <>
+                            <SpinnerIcon size={18} />
+                            <span>Wird erstellt...</span>
+                        </>
+                    ) : (
+                        <span>Spieler erstellen</span>
+                    )}
                 </button>
             </form>
         </div>

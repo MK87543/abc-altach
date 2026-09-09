@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Player } from '../types/interfaces'
+import { useToast } from '../components/Toast'
+import { useConfirm } from '../components/ConfirmModal'
 
 interface EditPlayersProps {
     onBack: () => void
@@ -8,6 +10,9 @@ interface EditPlayersProps {
 }
 
 export default function EditPlayers({ onBack, hideHeader }: EditPlayersProps) {
+    const { toast } = useToast()
+    const { confirm } = useConfirm()
+
     const [players, setPlayers] = useState<Player[]>([])
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
@@ -52,13 +57,25 @@ export default function EditPlayers({ onBack, hideHeader }: EditPlayersProps) {
             await fetchPlayers()
             setEditingId(null)
             setEditName('')
+            toast.success('Spielername aktualisiert.')
         } catch (error) {
             console.error('Fehler beim Speichern:', error)
-            alert('Fehler beim Speichern')
+            toast.error('Fehler beim Speichern.')
         }
     }
 
     const toggleActive = async (playerId: string, currentActive: boolean) => {
+        if (currentActive) {
+            const confirmed = await confirm({
+                title: 'Spieler deaktivieren',
+                message: 'Möchtest du diesen Spieler wirklich deaktivieren?',
+                confirmText: 'Deaktivieren',
+                cancelText: 'Abbrechen',
+                isDanger: true,
+            })
+            if (!confirmed) return
+        }
+
         try {
             const { error } = await supabase
                 .from('players')
@@ -68,11 +85,13 @@ export default function EditPlayers({ onBack, hideHeader }: EditPlayersProps) {
             if (error) throw error
 
             await fetchPlayers()
+            toast.success(currentActive ? 'Spieler deaktiviert.' : 'Spieler aktiviert.')
         } catch (error) {
             console.error('Fehler beim Ändern des Status:', error)
-            alert('Fehler beim Ändern des Status')
+            toast.error('Fehler beim Ändern des Status.')
         }
     }
+
 
     return (
         <div className={hideHeader ? "" : "bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6"}>

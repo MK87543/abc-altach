@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import NewPlayer from './NewPlayer'
 import NewCoach from './NewCoach'
 import { PlusIcon, UserIcon, CoachIcon } from '../components/Icons'
+import { useUrlQueryParam } from '../lib/urlUtils'
 
 interface ManageNewProps {
     onBack: () => void
@@ -10,7 +10,8 @@ interface ManageNewProps {
 type Tab = 'player' | 'coach'
 
 export default function ManageNew({ onBack }: ManageNewProps) {
-    const [activeTab, setActiveTab] = useState<Tab>('player')
+    const [activeTab, setActiveTab] = useUrlQueryParam<Tab>('manageTab', 'player')
+
 
     return (
         <div className="p-6 max-w-2xl mx-auto">

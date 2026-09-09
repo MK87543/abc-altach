@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../components/Toast'
+import { SpinnerIcon } from '../components/Icons'
 
 interface NewCoachProps {
     onBack: () => void
@@ -8,6 +10,7 @@ interface NewCoachProps {
 }
 
 export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProps) {
+    const { toast } = useToast()
     const [name, setName] = useState('')
     const [role, setRole] = useState('Trainer')
     const [loading, setLoading] = useState(false)
@@ -32,6 +35,7 @@ export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProp
             setSuccess(true)
             setName('')
             setRole('Trainer')
+            toast.success('Trainer erfolgreich erstellt!')
 
             if (onSuccess) {
                 onSuccess()
@@ -42,11 +46,12 @@ export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProp
             }, 3000)
         } catch (error) {
             console.error('Fehler beim Erstellen des Trainers:', error)
-            alert('Fehler beim Erstellen des Trainers')
+            toast.error('Fehler beim Erstellen des Trainers: ' + (error as Error).message)
         } finally {
             setLoading(false)
         }
     }
+
 
     return (
         <div className={hideHeader ? "" : "bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6"}>
@@ -101,9 +106,16 @@ export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProp
                 <button
                     type="submit"
                     disabled={loading || !name.trim()}
-                    className="w-full bg-blue-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
-                    {loading ? 'Wird erstellt...' : 'Trainer erstellen'}
+                    {loading ? (
+                        <>
+                            <SpinnerIcon size={18} />
+                            <span>Wird erstellt...</span>
+                        </>
+                    ) : (
+                        <span>Trainer erstellen</span>
+                    )}
                 </button>
             </form>
         </div>

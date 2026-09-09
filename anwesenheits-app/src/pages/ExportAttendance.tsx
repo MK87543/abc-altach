@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import * as ExcelJS from 'exceljs'
 import type { Attendance, Coach, CoachAttendance, Player, Training } from '../types/interfaces'
+import { useToast } from '../components/Toast'
+import { useUrlQueryParam } from '../lib/urlUtils'
+import { SpinnerIcon } from '../components/Icons'
 
 interface ExportAttendanceProps {
     onBack?: () => void
@@ -17,15 +20,17 @@ type NavigatorWithMsSaveBlob = Navigator & {
 }
 
 export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
-    const [startDate, setStartDate] = useState('')
-    const [endDate, setEndDate] = useState('')
+    const { toast } = useToast()
+    const [startDate, setStartDate] = useUrlQueryParam<string>('exportFrom', '')
+    const [endDate, setEndDate] = useUrlQueryParam<string>('exportTo', '')
     const [loading, setLoading] = useState(false)
 
     async function exportToExcel() {
         if (!startDate || !endDate) {
-            alert('Bitte Start- und Enddatum auswählen')
+            toast.warning('Bitte Start- und Enddatum auswählen.')
             return
         }
+
 
         setLoading(true)
         console.log('DEBUG: Export gestartet...')
@@ -64,7 +69,7 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
             const trainings = (trainingsResponse.data || []) as TrainingWithAttendance[]
 
             if (trainings.length === 0) {
-                alert('Keine Trainings im ausgewählten Zeitraum gefunden')
+                toast.info('Keine Trainings im ausgewählten Zeitraum gefunden.')
                 setLoading(false)
                 return
             }
@@ -191,12 +196,11 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
                     window.URL.revokeObjectURL(url)
                 }, 60000)
             }
-
             console.log('ERFOLG: Download initiiert')
-
+            toast.success('Excel-Export erfolgreich heruntergeladen!')
         } catch (error) {
             console.error('FEHLER:', error)
-            alert('Fehler beim Export: ' + (error as Error).message)
+            toast.error('Fehler beim Export: ' + (error as Error).message)
         } finally {
             setLoading(false)
         }
@@ -250,11 +254,19 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
                 <button
                     onClick={exportToExcel}
                     disabled={loading || !startDate || !endDate}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
-                    {loading ? 'Exportiere...' : 'Als Excel herunterladen'}
+                    {loading ? (
+                        <>
+                            <SpinnerIcon size={20} />
+                            <span>Exportiere...</span>
+                        </>
+                    ) : (
+                        <span>Als Excel herunterladen</span>
+                    )}
                 </button>
             </div>
         </div>
     )
 }
+

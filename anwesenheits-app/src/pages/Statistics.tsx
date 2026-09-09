@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { ChartIcon } from '../components/Icons'
+import { ChartIcon, SpinnerIcon } from '../components/Icons'
+import { useUrlQueryParam } from '../lib/urlUtils'
+import { useToast } from '../components/Toast'
 
 interface StatisticsProps {
     onBack?: () => void
@@ -22,18 +24,45 @@ interface CoachStats {
     totalCount: number
 }
 
+function getProgressWidthClass(pct: number): string {
+    if (pct >= 100) return 'w-full'
+    if (pct >= 95) return 'w-[95%]'
+    if (pct >= 90) return 'w-[90%]'
+    if (pct >= 85) return 'w-[85%]'
+    if (pct >= 80) return 'w-[80%]'
+    if (pct >= 75) return 'w-3/4'
+    if (pct >= 70) return 'w-[70%]'
+    if (pct >= 65) return 'w-[65%]'
+    if (pct >= 60) return 'w-[60%]'
+    if (pct >= 55) return 'w-[55%]'
+    if (pct >= 50) return 'w-1/2'
+    if (pct >= 45) return 'w-[45%]'
+    if (pct >= 40) return 'w-[40%]'
+    if (pct >= 35) return 'w-[35%]'
+    if (pct >= 33) return 'w-1/3'
+    if (pct >= 30) return 'w-[30%]'
+    if (pct >= 25) return 'w-1/4'
+    if (pct >= 20) return 'w-[20%]'
+    if (pct >= 15) return 'w-[15%]'
+    if (pct >= 10) return 'w-[10%]'
+    if (pct >= 5) return 'w-[5%]'
+    return 'w-0'
+}
+
 export default function Statistics({ onBack }: StatisticsProps) {
+    const { toast } = useToast()
     const [stats, setStats] = useState<PlayerStats[]>([])
     const [coachStats, setCoachStats] = useState<CoachStats[]>([])
     const [totalTrainings, setTotalTrainings] = useState(0)
     const [loading, setLoading] = useState(true)
-    const [startDate, setStartDate] = useState('')
-    const [endDate, setEndDate] = useState('')
-    const [activeTab, setActiveTab] = useState<'player' | 'coach'>('player')
+    const [startDate, setStartDate] = useUrlQueryParam<string>('statsFrom', '')
+    const [endDate, setEndDate] = useUrlQueryParam<string>('statsTo', '')
+    const [activeTab, setActiveTab] = useUrlQueryParam<'player' | 'coach'>('statsTab', 'player')
 
     useEffect(() => {
         loadData()
-    }, [])
+    }, [startDate, endDate])
+
 
     async function loadData() {
         setLoading(true)
@@ -140,7 +169,7 @@ export default function Statistics({ onBack }: StatisticsProps) {
 
         } catch (error) {
             console.error('Fehler beim Laden der Statistik:', error)
-            alert('Statistik konnte nicht geladen werden.')
+            toast.error('Statistik konnte nicht geladen werden.')
         } finally {
             setLoading(false)
         }
@@ -236,7 +265,10 @@ export default function Statistics({ onBack }: StatisticsProps) {
                 </div>
 
                 {loading ? (
-                    <div className="p-8 text-center text-gray-500">Lade Statistik...</div>
+                    <div className="p-12 flex flex-col items-center justify-center gap-3 text-gray-500">
+                        <SpinnerIcon size={28} className="text-blue-600" />
+                        <p className="text-sm font-medium">Lade Statistik...</p>
+                    </div>
                 ) : activeTab === 'player' ? (
                     stats.length === 0 ? (
                         <div className="p-8 text-center text-gray-500">Keine Daten verfügbar</div>
@@ -268,8 +300,7 @@ export default function Statistics({ onBack }: StatisticsProps) {
                                                             className={`h-1.5 sm:h-2.5 rounded-full ${player.percentage >= 75 ? 'bg-green-500' :
                                                                     player.percentage >= 50 ? 'bg-blue-500' :
                                                                         player.percentage >= 25 ? 'bg-yellow-500' : 'bg-red-500'
-                                                                }`}
-                                                            style={{ width: `${player.percentage}%` }}
+                                                                } ${getProgressWidthClass(player.percentage)}`}
                                                         ></div>
                                                     </div>
                                                     <span className="font-bold text-xs w-8">{player.percentage}%</span>

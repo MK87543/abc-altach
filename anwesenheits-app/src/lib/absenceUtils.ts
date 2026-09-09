@@ -104,39 +104,49 @@ export function formatRecurringSummary(
 export function isCoachAbsentOnDate(absence: CoachAbsence, dateStr: string): boolean {
     if (!absence || !dateStr) return false
 
+    const cleanDate = dateStr.split('T')[0]
+    const cleanStart = (absence.start_date || '').split('T')[0]
+    const cleanEnd = absence.end_date ? absence.end_date.split('T')[0] : null
+
     // 1. Einzeltag
     if (absence.absence_type === 'single') {
-        return absence.start_date === dateStr
+        return cleanStart === cleanDate
     }
 
     // 2. Datumsbereich (z. B. Urlaub über mehrere Tage/Wochen)
     if (absence.absence_type === 'range') {
-        if (dateStr < absence.start_date) return false
-        if (absence.end_date && dateStr > absence.end_date) return false
+        if (cleanStart && cleanDate < cleanStart) return false
+        if (cleanEnd && cleanDate > cleanEnd) return false
         return true
     }
 
     // 3. Wiederkehrend (z. B. jeden Dienstag oder alle 2 Wochen Di & Do)
-    if (absence.absence_type === 'recurring') {
-        // Gilt erst ab start_date
-        if (dateStr < absence.start_date) return false
+    const isRecurring = absence.absence_type === 'recurring' || (absence as any).absence_type === 'weekly'
+    if (isRecurring) {
+        // Gilt erst ab start_date (falls definiert)
+        if (cleanStart && cleanDate < cleanStart) return false
         // Wenn ein Enddatum definiert ist, gilt es nur bis dahin
-        if (absence.end_date && dateStr > absence.end_date) return false
+        if (cleanEnd && cleanDate > cleanEnd) return false
 
-        const dayOfWeek = getDayOfWeekFromDateString(dateStr)
+        const dayOfWeek = getDayOfWeekFromDateString(cleanDate)
 
-        const days: number[] = (absence.recurring_days && absence.recurring_days.length > 0)
+        const anyAbs = absence as any
+        const rawDays: number[] = (absence.recurring_days && absence.recurring_days.length > 0)
             ? absence.recurring_days
-            : (absence.recurring_day_of_week !== null && absence.recurring_day_of_week !== undefined ? [absence.recurring_day_of_week] : [])
+            : (Array.isArray(anyAbs.weekdays) && anyAbs.weekdays.length > 0)
+            ? anyAbs.weekdays
+            : (absence.recurring_day_of_week !== null && absence.recurring_day_of_week !== undefined
+                ? [absence.recurring_day_of_week]
+                : [])
 
-        if (!days.includes(dayOfWeek)) {
+        if (!rawDays.includes(dayOfWeek)) {
             return false
         }
 
-        // Intervall prüfen (z. B. alle 2 Wochen)
-        const interval = absence.recurrence_interval || 1
-        if (interval > 1) {
-            const diffWeeks = getCalendarWeekDifference(absence.start_date, dateStr)
+        // Intervall prüfen (z. B. alle 2, 3, 4 Wochen)
+        const interval = absence.recurrence_interval || anyAbs.interval_weeks || 1
+        if (interval > 1 && cleanStart) {
+            const diffWeeks = getCalendarWeekDifference(cleanStart, cleanDate)
             if (diffWeeks < 0 || diffWeeks % interval !== 0) {
                 return false
             }

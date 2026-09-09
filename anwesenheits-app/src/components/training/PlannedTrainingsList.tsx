@@ -1,35 +1,28 @@
-import { useState, useMemo } from 'react'
-import { supabase } from '../../lib/supabase'
-import type { Coach, CoachAbsence, Training } from '../../types/interfaces'
-import { useToast } from '../Toast'
-import { useConfirm } from '../ConfirmModal'
+import { useState } from 'react'
+import type { Coach, CoachAbsence } from '../../types/interfaces'
+import type { TrainingWithCoaches } from '../../hooks/useTrainingPlanner'
 import {
     CalendarIcon,
-    CheckIcon,
-    XIcon,
+    ClipboardIcon,
     EditIcon,
     TrashIcon,
     CircleIcon,
     UserIcon,
-    SpinnerIcon,
-    PlusIcon
+    CheckIcon
 } from '../Icons'
-import { getCoachAbsenceMapForDate, formatAbsenceGerman } from '../../lib/absenceUtils'
-
-export interface TrainingWithCoaches extends Training {
-    coach_attendance?: {
-        coach_id: string
-        is_mandatory: boolean
-        coaches: { name: string }
-    }[]
-}
+import { getCoachAbsenceMapForDate } from '../../lib/absenceUtils'
 
 interface PlannedTrainingsListProps {
     trainings: TrainingWithCoaches[]
     coaches: Coach[]
     absences: CoachAbsence[]
-    onRefresh: () => Promise<void>
-    onSwitchToPlan?: () => void
+    onUpdateTraining: (
+        id: string,
+        description: string,
+        mandatoryCoachIds: string[],
+        additionalCoachIds: string[]
+    ) => Promise<boolean>
+    onDeleteTraining: (id: string) => Promise<boolean>
 }
 
 function formatDateGerman(dateString: string) {
@@ -43,15 +36,15 @@ function formatDateGerman(dateString: string) {
     if (dateString === today) {
         prefixElement = (
             <span className="inline-flex items-center gap-1 mr-2">
-                <CircleIcon className="text-emerald-500 fill-emerald-500" size={10} />
-                <span className="font-bold text-emerald-700 text-xs tracking-wider">HEUTE</span>
+                <CircleIcon className="text-red-600" size={10} />
+                <span className="font-bold text-red-600 text-xs tracking-wider">HEUTE</span>
             </span>
         )
     } else if (dateString === tomorrowStr) {
         prefixElement = (
             <span className="inline-flex items-center gap-1 mr-2">
-                <CircleIcon className="text-amber-500 fill-amber-500" size={10} />
-                <span className="font-bold text-amber-700 text-xs tracking-wider">MORGEN</span>
+                <CircleIcon className="text-amber-500" size={10} />
+                <span className="font-bold text-amber-600 text-xs tracking-wider">MORGEN</span>
             </span>
         )
     }
@@ -70,222 +63,102 @@ export default function PlannedTrainingsList({
     trainings,
     coaches,
     absences,
-    onRefresh,
-    onSwitchToPlan
+    onUpdateTraining,
+    onDeleteTraining
 }: PlannedTrainingsListProps) {
-    const { toast } = useToast()
-    const { confirm } = useConfirm()
-
-    const [searchQuery, setSearchQuery] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editDescription, setEditDescription] = useState('')
     const [editMandatoryCoachIds, setEditMandatoryCoachIds] = useState<string[]>([])
     const [editAdditionalCoachIds, setEditAdditionalCoachIds] = useState<string[]>([])
     const [deletingId, setDeletingId] = useState<string | null>(null)
-    const [savingEdit, setSavingEdit] = useState(false)
 
-    // Filter trainings by search
-    const filteredTrainings = useMemo(() => {
-        if (!searchQuery.trim()) return trainings
-        const q = searchQuery.toLowerCase()
-        return trainings.filter(t => {
-            if (t.date.toLowerCase().includes(q)) return true
-            if (t.description?.toLowerCase().includes(q)) return true
-            const hasCoachMatch = t.coach_attendance?.some(ca =>
-                ca.coaches?.name?.toLowerCase().includes(q)
-            )
-            return Boolean(hasCoachMatch)
-        })
-    }, [trainings, searchQuery])
-
-    const startEditing = (training: TrainingWithCoaches) => {
+    function startEditing(training: TrainingWithCoaches) {
         setEditingId(training.id)
         setEditDescription(training.description || '')
-        setEditMandatoryCoachIds(
-            training.coach_attendance
-                ?.filter(ca => ca.is_mandatory)
-                .map(ca => ca.coach_id) ?? []
-        )
-        setEditAdditionalCoachIds(
-            training.coach_attendance
-                ?.filter(ca => !ca.is_mandatory)
-                .map(ca => ca.coach_id) ?? []
-        )
+        const mandatory = (training.coach_attendance || [])
+            .filter(ca => ca.is_mandatory)
+            .map(ca => ca.coach_id)
+        const additional = (training.coach_attendance || [])
+            .filter(ca => !ca.is_mandatory)
+            .map(ca => ca.coach_id)
+        setEditMandatoryCoachIds(mandatory)
+        setEditAdditionalCoachIds(additional)
     }
 
-    const cancelEditing = () => {
+    function cancelEditing() {
         setEditingId(null)
-        setEditDescription('')
         setEditMandatoryCoachIds([])
         setEditAdditionalCoachIds([])
     }
 
-    const saveEdit = async (trainingId: string) => {
-        setSavingEdit(true)
-        try {
-            // 1. Update description
-            const { error: descError } = await supabase
-                .from('trainings')
-                .update({ description: editDescription.trim() || null })
-                .eq('id', trainingId)
-
-            if (descError) {
-                toast.error('Fehler beim Aktualisieren: ' + descError.message)
-                return
-            }
-
-            // 2. Delete existing coach_attendance and insert updated
-            await supabase.from('coach_attendance').delete().eq('training_id', trainingId)
-
-            const allCoachInserts = [
-                ...editMandatoryCoachIds.map(coachId => ({
-                    training_id: trainingId,
-                    coach_id: coachId,
-                    is_present: true,
-                    is_mandatory: true
-                })),
-                ...editAdditionalCoachIds.map(coachId => ({
-                    training_id: trainingId,
-                    coach_id: coachId,
-                    is_present: true,
-                    is_mandatory: false
-                }))
-            ]
-
-            if (allCoachInserts.length > 0) {
-                await supabase.from('coach_attendance').insert(allCoachInserts)
-            }
-
+    async function handleSaveEdit(id: string) {
+        const success = await onUpdateTraining(
+            id,
+            editDescription,
+            editMandatoryCoachIds,
+            editAdditionalCoachIds
+        )
+        if (success) {
             cancelEditing()
-            await onRefresh()
-            toast.success('Training erfolgreich aktualisiert!')
-        } catch (err) {
-            console.error('Update training error:', err)
-            toast.error('Fehler beim Speichern der Änderungen.')
-        } finally {
-            setSavingEdit(false)
         }
     }
 
-    const handleDelete = async (trainingId: string, dateStr: string) => {
-        const confirmed = await confirm({
-            title: 'Training löschen',
-            message: `Möchtest du das Training am ${dateStr} wirklich löschen? Alle zugehörigen Anwesenheitsdaten gehen unwiderruflich verloren.`,
-            confirmText: 'Unwiderruflich löschen',
-            cancelText: 'Abbrechen',
-            isDanger: true,
-        })
-        if (!confirmed) return
-
-        setDeletingId(trainingId)
+    async function handleDelete(id: string) {
+        setDeletingId(id)
         try {
-            await supabase.from('attendance').delete().eq('training_id', trainingId)
-            await supabase.from('coach_attendance').delete().eq('training_id', trainingId)
-
-            const { error } = await supabase
-                .from('trainings')
-                .delete()
-                .eq('id', trainingId)
-
-            if (error) {
-                toast.error('Fehler beim Löschen: ' + error.message)
-            } else {
-                await onRefresh()
-                toast.success('Training gelöscht.')
-            }
-        } catch (err) {
-            console.error('Delete training error:', err)
-            toast.error('Unerwarteter Fehler beim Löschen.')
+            await onDeleteTraining(id)
         } finally {
             setDeletingId(null)
         }
     }
 
     return (
-        <div className="space-y-4">
-            {/* Kopfbereich mit Suchfeld und Statistik */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl shadow-xs border border-slate-100">
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-800">
-                        Geplante Trainings
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
-                        {trainings.length}
-                    </span>
-                </div>
+        <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-5">
+            <h2 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <ClipboardIcon size={20} className="text-slate-600" />
+                <span>Geplante Trainings ({trainings.length})</span>
+            </h2>
 
-                <div className="w-full sm:w-64">
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Datum, Beschreibung, Trainer..."
-                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    />
-                </div>
-            </div>
-
-            {/* Liste der Trainings */}
-            {filteredTrainings.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-xs border border-slate-100 p-12 text-center">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
-                        <CalendarIcon size={24} />
-                    </div>
-                    <h3 className="text-base font-bold text-slate-800 mb-1">
-                        {trainings.length === 0 ? 'Noch keine Trainings geplant' : 'Keine Treffer gefunden'}
-                    </h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto mb-6">
-                        {trainings.length === 0
-                            ? 'Nutze die Schnell-Planung oder den Serien-Generator, um zukünftige Trainings anzulegen.'
-                            : 'Passe deinen Suchfilter an, um geplante Trainings anzuzeigen.'}
-                    </p>
-                    {onSwitchToPlan && trainings.length === 0 && (
-                        <button
-                            type="button"
-                            onClick={onSwitchToPlan}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
-                        >
-                            <PlusIcon size={16} />
-                            <span>Jetzt Trainings planen</span>
-                        </button>
-                    )}
-                </div>
+            {trainings.length === 0 ? (
+                <p className="text-slate-500 text-xs text-center py-6">
+                    Noch keine Trainings geplant. Erstelle dein erstes Training oben oder wechsle zur Saison-Planung.
+                </p>
             ) : (
-                <div className="space-y-3">
-                    {filteredTrainings.map(training => {
+                <div className="space-y-2.5">
+                    {trainings.map(training => {
                         const isToday = training.date === new Date().toISOString().split('T')[0]
                         const isEditing = editingId === training.id
-                        const formatted = formatDateGerman(training.date)
                         const absenceMap = getCoachAbsenceMapForDate(absences, training.date)
+                        const formatted = formatDateGerman(training.date)
 
                         return (
                             <div
                                 key={training.id}
-                                className={`p-4 sm:p-5 rounded-2xl transition border ${
+                                className={`p-3.5 rounded-xl border transition ${
                                     isToday
-                                        ? 'bg-blue-50/60 border-blue-200 shadow-xs'
-                                        : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
+                                        ? 'bg-blue-50/70 border-blue-200'
+                                        : 'bg-white border-slate-200 hover:border-slate-300'
                                 }`}
                             >
-                                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                                <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
                                     <div className="flex-1 w-full">
                                         {/* Datum & Heute-Badge */}
-                                        <div className="flex items-center gap-2 mb-1.5">
+                                        <div className="flex items-center gap-2 mb-1">
                                             <CalendarIcon size={16} className="text-slate-400" />
                                             <span className="font-bold text-slate-800 text-sm sm:text-base flex items-center">
                                                 {formatted.prefix}
                                                 {formatted.dateStr}
                                             </span>
                                             {isToday && (
-                                                <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                                <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                                                     Heute
                                                 </span>
                                             )}
                                         </div>
 
                                         {isEditing ? (
-                                            /* Bearbeitungs-Modus */
-                                            <div className="mt-3 space-y-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                                            /* Inline-Bearbeitung */
+                                            <div className="mt-3 space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
                                                 <div>
                                                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                                                         Beschreibung
@@ -294,74 +167,46 @@ export default function PlannedTrainingsList({
                                                         type="text"
                                                         value={editDescription}
                                                         onChange={(e) => setEditDescription(e.target.value)}
-                                                        placeholder="z. B. Meisterschaftsvorbereitung..."
-                                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        placeholder="Beschreibung (optional)..."
+                                                        className="w-full px-3 py-2 border border-slate-300 rounded-xl text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     />
                                                 </div>
 
                                                 {/* Pflichttrainer */}
                                                 <div>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className="text-xs font-semibold text-blue-700">
-                                                            Pflichttrainer
-                                                        </span>
-                                                        <span className={`text-[11px] font-bold px-2 py-0.2 rounded-full ${
-                                                            editMandatoryCoachIds.length >= 2
-                                                                ? 'bg-amber-100 text-amber-800'
-                                                                : 'bg-blue-100 text-blue-700'
-                                                        }`}>
-                                                            {editMandatoryCoachIds.length}/2
-                                                        </span>
-                                                    </div>
+                                                    <span className="block text-xs font-semibold text-blue-700 mb-1.5">
+                                                        Pflichttrainer ({editMandatoryCoachIds.length}/2)
+                                                    </span>
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {coaches.map(coach => {
                                                             const isSelected = editMandatoryCoachIds.includes(coach.id)
                                                             const isAlreadyAdditional = editAdditionalCoachIds.includes(coach.id)
                                                             const isDisabled = isAlreadyAdditional || (!isSelected && editMandatoryCoachIds.length >= 2)
                                                             const editAbsence = absenceMap.get(coach.id)
-
                                                             return (
                                                                 <button
                                                                     key={coach.id}
                                                                     type="button"
                                                                     disabled={isDisabled}
-                                                                    title={editAbsence ? `Achtung: ${coach.name} ist abwesend (${formatAbsenceGerman(editAbsence)})` : undefined}
-                                                                    onClick={async () => {
-                                                                        if (isDisabled) return
-                                                                        if (!isSelected && editAbsence) {
-                                                                            const confirmed = await confirm({
-                                                                                title: 'Trainer abwesend',
-                                                                                message: `Hinweis: ${coach.name} ist an diesem Tag als abwesend eingetragen (${formatAbsenceGerman(editAbsence)}).\n\nTrotzdem als Pflichttrainer einteilen?`,
-                                                                                confirmText: 'Trotzdem einteilen',
-                                                                                cancelText: 'Abbrechen',
-                                                                                isDanger: false,
-                                                                            })
-                                                                            if (!confirmed) return
-                                                                        }
+                                                                    onClick={() => {
                                                                         setEditMandatoryCoachIds(prev =>
                                                                             prev.includes(coach.id)
                                                                                 ? prev.filter(id => id !== coach.id)
                                                                                 : [...prev, coach.id]
                                                                         )
                                                                     }}
-                                                                    className={`px-2.5 py-1 rounded-lg border text-xs transition flex items-center gap-1.5 cursor-pointer ${
+                                                                    className={`px-3 py-1.5 rounded-lg text-xs border transition flex items-center gap-1.5 cursor-pointer min-h-[38px] ${
                                                                         isDisabled
                                                                             ? 'opacity-40 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
                                                                             : isSelected
-                                                                            ? 'bg-blue-600 text-white border-blue-600 font-semibold shadow-2xs'
-                                                                            : editAbsence
-                                                                            ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'
-                                                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                                                            ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                                                                            : 'bg-white border-slate-200 text-slate-700'
                                                                     }`}
                                                                 >
-                                                                    <UserIcon size={12} />
+                                                                    <UserIcon size={14} />
                                                                     <span>{coach.name}</span>
-                                                                    {editAbsence && (
-                                                                        <span className="text-[10px] bg-red-200 text-red-900 px-1 rounded-full font-bold">
-                                                                            Abwesend
-                                                                        </span>
-                                                                    )}
-                                                                    {isSelected && <CheckIcon size={12} />}
+                                                                    {editAbsence && <span className="text-[9px] bg-red-100 text-red-800 px-1 rounded font-bold">Abwesend</span>}
+                                                                    {isSelected && <CheckIcon size={13} />}
                                                                 </button>
                                                             )
                                                         })}
@@ -370,187 +215,123 @@ export default function PlannedTrainingsList({
 
                                                 {/* Zusatztrainer */}
                                                 <div>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className="text-xs font-semibold text-emerald-700">
-                                                            Zusatztrainer (freiwillig)
-                                                        </span>
-                                                        {editAdditionalCoachIds.length > 0 && (
-                                                            <span className="text-[11px] font-bold px-2 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
-                                                                {editAdditionalCoachIds.length} gewählt
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    <span className="block text-xs font-semibold text-emerald-700 mb-1.5">
+                                                        Zusatztrainer
+                                                    </span>
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {coaches.map(coach => {
                                                             const isSelected = editAdditionalCoachIds.includes(coach.id)
                                                             const isAlreadyMandatory = editMandatoryCoachIds.includes(coach.id)
                                                             const editAbsence = absenceMap.get(coach.id)
-
                                                             return (
                                                                 <button
                                                                     key={coach.id}
                                                                     type="button"
                                                                     disabled={isAlreadyMandatory}
-                                                                    title={editAbsence ? `Achtung: ${coach.name} ist abwesend (${formatAbsenceGerman(editAbsence)})` : undefined}
-                                                                    onClick={async () => {
-                                                                        if (isAlreadyMandatory) return
-                                                                        if (!isSelected && editAbsence) {
-                                                                            const confirmed = await confirm({
-                                                                                title: 'Trainer abwesend',
-                                                                                message: `Hinweis: ${coach.name} ist an diesem Tag als abwesend eingetragen (${formatAbsenceGerman(editAbsence)}).\n\nTrotzdem als Zusatztrainer einteilen?`,
-                                                                                confirmText: 'Trotzdem einteilen',
-                                                                                cancelText: 'Abbrechen',
-                                                                                isDanger: false,
-                                                                            })
-                                                                            if (!confirmed) return
-                                                                        }
+                                                                    onClick={() => {
                                                                         setEditAdditionalCoachIds(prev =>
                                                                             prev.includes(coach.id)
                                                                                 ? prev.filter(id => id !== coach.id)
                                                                                 : [...prev, coach.id]
                                                                         )
                                                                     }}
-                                                                    className={`px-2.5 py-1 rounded-lg border text-xs transition flex items-center gap-1.5 cursor-pointer ${
+                                                                    className={`px-3 py-1.5 rounded-lg text-xs border transition flex items-center gap-1.5 cursor-pointer min-h-[38px] ${
                                                                         isAlreadyMandatory
                                                                             ? 'opacity-40 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-400'
                                                                             : isSelected
-                                                                            ? 'bg-emerald-600 text-white border-emerald-600 font-semibold shadow-2xs'
-                                                                            : editAbsence
-                                                                            ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'
-                                                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                                                            ? 'bg-emerald-600 text-white border-emerald-600 font-semibold'
+                                                                            : 'bg-white border-slate-200 text-slate-700'
                                                                     }`}
                                                                 >
-                                                                    <UserIcon size={12} />
+                                                                    <UserIcon size={14} />
                                                                     <span>{coach.name}</span>
-                                                                    {editAbsence && (
-                                                                        <span className="text-[10px] bg-red-200 text-red-900 px-1 rounded-full font-bold">
-                                                                            Abwesend
-                                                                        </span>
-                                                                    )}
-                                                                    {isSelected && <CheckIcon size={12} />}
+                                                                    {editAbsence && <span className="text-[9px] bg-red-100 text-red-800 px-1 rounded font-bold">Abwesend</span>}
+                                                                    {isSelected && <CheckIcon size={13} />}
                                                                 </button>
                                                             )
                                                         })}
                                                     </div>
                                                 </div>
+
+                                                {/* Aktionen Bearbeitung */}
+                                                <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                                                    <button
+                                                        type="button"
+                                                        onClick={cancelEditing}
+                                                        className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg transition min-h-[40px] flex items-center"
+                                                    >
+                                                        Abbrechen
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveEdit(training.id)}
+                                                        className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition min-h-[40px] flex items-center gap-1"
+                                                    >
+                                                        <CheckIcon size={14} />
+                                                        <span>Speichern</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         ) : (
-                                            /* Anzeige-Modus */
-                                            <>
-                                                <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                                                    {training.description || (
-                                                        <span className="italic text-slate-400">Keine Beschreibung</span>
-                                                    )}
-                                                </p>
-
-                                                {training.coach_attendance && training.coach_attendance.length > 0 && (
-                                                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                                        {/* Pflicht */}
-                                                        {training.coach_attendance.some(ca => ca.is_mandatory) && (
-                                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md">
-                                                                    Pflicht:
-                                                                </span>
-                                                                {training.coach_attendance.filter(ca => ca.is_mandatory).map(ca => {
-                                                                    const coachAbsence = absenceMap.get(ca.coach_id)
-                                                                    return (
-                                                                        <span
-                                                                            key={ca.coach_id}
-                                                                            className="inline-flex items-center gap-1 text-xs text-blue-900 font-semibold bg-blue-100/60 px-2 py-0.5 rounded-md"
-                                                                        >
-                                                                            {ca.coaches?.name}
-                                                                            {coachAbsence && (
-                                                                                <span
-                                                                                    className="text-[9px] bg-red-100 text-red-800 border border-red-200 px-1 rounded-sm font-bold"
-                                                                                    title={`Abwesend: ${formatAbsenceGerman(coachAbsence)}`}
-                                                                                >
-                                                                                    ⚠️ Abwesend
-                                                                                </span>
-                                                                            )}
-                                                                        </span>
-                                                                    )
-                                                                })}
-                                                            </div>
-                                                        )}
-
-                                                        {/* Zusatz */}
-                                                        {training.coach_attendance.some(ca => !ca.is_mandatory) && (
-                                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                                                                    Zusatz:
-                                                                </span>
-                                                                {training.coach_attendance.filter(ca => !ca.is_mandatory).map(ca => {
-                                                                    const coachAbsence = absenceMap.get(ca.coach_id)
-                                                                    return (
-                                                                        <span
-                                                                            key={ca.coach_id}
-                                                                            className="inline-flex items-center gap-1 text-xs text-emerald-900 font-semibold bg-emerald-100/60 px-2 py-0.5 rounded-md"
-                                                                        >
-                                                                            {ca.coaches?.name}
-                                                                            {coachAbsence && (
-                                                                                <span
-                                                                                    className="text-[9px] bg-red-100 text-red-800 border border-red-200 px-1 rounded-sm font-bold"
-                                                                                    title={`Abwesend: ${formatAbsenceGerman(coachAbsence)}`}
-                                                                                >
-                                                                                    ⚠️ Abwesend
-                                                                                </span>
-                                                                            )}
-                                                                        </span>
-                                                                    )
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                            /* Normale Ansicht */
+                                            <div>
+                                                {training.description && (
+                                                    <p className="text-slate-600 text-xs sm:text-sm mt-0.5">
+                                                        {training.description}
+                                                    </p>
                                                 )}
-                                            </>
+
+                                                {/* Trainer-Badges */}
+                                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                                    {training.coach_attendance && training.coach_attendance.length > 0 ? (
+                                                        training.coach_attendance.map((ca, idx) => (
+                                                            <span
+                                                                key={idx}
+                                                                className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                                                                    ca.is_mandatory
+                                                                        ? 'bg-blue-100 text-blue-800'
+                                                                        : 'bg-emerald-100 text-emerald-800'
+                                                                }`}
+                                                            >
+                                                                <UserIcon size={11} />
+                                                                <span>{ca.coaches?.name || 'Trainer'}</span>
+                                                                {ca.is_mandatory && (
+                                                                    <span className="text-[9px] opacity-75">(Pflicht)</span>
+                                                                )}
+                                                            </span>
+                                                        ))
+                                                    ) : (
+                                                        <span className="text-slate-400 text-xs italic">
+                                                            Keine Trainer eingeteilt
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
 
-                                    {/* Action Buttons */}
-                                    <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
-                                        {isEditing ? (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    disabled={savingEdit}
-                                                    onClick={() => saveEdit(training.id)}
-                                                    className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition text-xs flex items-center justify-center cursor-pointer shadow-xs"
-                                                    title="Änderungen speichern"
-                                                >
-                                                    {savingEdit ? <SpinnerIcon size={16} /> : <CheckIcon size={16} />}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    disabled={savingEdit}
-                                                    onClick={cancelEditing}
-                                                    className="p-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl transition text-xs flex items-center justify-center cursor-pointer"
-                                                    title="Abbrechen"
-                                                >
-                                                    <XIcon size={16} />
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => startEditing(training)}
-                                                    className="p-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 rounded-xl transition text-xs flex items-center justify-center cursor-pointer"
-                                                    title="Bearbeiten"
-                                                >
-                                                    <EditIcon size={16} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    disabled={deletingId === training.id}
-                                                    onClick={() => handleDelete(training.id, formatted.dateStr)}
-                                                    className="p-2 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 rounded-xl transition text-xs flex items-center justify-center cursor-pointer disabled:opacity-50"
-                                                    title="Löschen"
-                                                >
-                                                    {deletingId === training.id ? <SpinnerIcon size={16} /> : <TrashIcon size={16} />}
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
+                                    {/* Action Buttons (wenn nicht im Edit-Modus) */}
+                                    {!isEditing && (
+                                        <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => startEditing(training)}
+                                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+                                                title="Bearbeiten"
+                                            >
+                                                <EditIcon size={16} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDelete(training.id)}
+                                                disabled={deletingId === training.id}
+                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+                                                title="Löschen"
+                                            >
+                                                <TrashIcon size={16} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )

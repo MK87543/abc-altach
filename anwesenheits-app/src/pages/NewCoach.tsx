@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
-import { SpinnerIcon } from '../components/Icons'
+import { SpinnerIcon, ChevronLeftIcon } from '../components/Icons'
 
 interface NewCoachProps {
     onBack: () => void
@@ -54,14 +54,15 @@ export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProp
 
 
     return (
-        <div className={hideHeader ? "" : "bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6"}>
+        <div className={hideHeader ? "" : "bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-5"}>
             {!hideHeader && (
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-5">
                     <h2 className="text-2xl font-bold text-gray-800">Neuer Trainer</h2>
                     <button
                         onClick={onBack}
-                        className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition flex items-center gap-2"
+                        className="flex items-center gap-1.5 text-slate-600 hover:text-slate-800 px-3 py-2 rounded-xl transition text-sm font-medium cursor-pointer hover:bg-slate-100 min-h-[44px]"
                     >
+                        <ChevronLeftIcon size={18} />
                         Zurück
                     </button>
                 </div>
@@ -69,7 +70,7 @@ export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProp
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label htmlFor="coachName" className="block text-gray-700 font-medium mb-2">
+                    <label htmlFor="coachName" className="block text-gray-700 font-medium mb-2 text-base">
                         Name
                     </label>
                     <input
@@ -78,13 +79,13 @@ export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProp
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Name des Trainers eingeben..."
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                         required
                     />
                 </div>
 
                 <div>
-                    <label htmlFor="coachRole" className="block text-gray-700 font-medium mb-2">
+                    <label htmlFor="coachRole" className="block text-gray-700 font-medium mb-2 text-base">
                         Rolle (optional)
                     </label>
                     <input
@@ -93,12 +94,12 @@ export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProp
                         value={role}
                         onChange={(e) => setRole(e.target.value)}
                         placeholder="z.B. Trainer, Co-Trainer, Physiotherapeut..."
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                     />
                 </div>
 
                 {success && (
-                    <div className="p-3 bg-green-100 text-green-700 rounded-lg">
+                    <div className="p-3 bg-green-100 text-green-700 rounded-xl font-medium">
                         Trainer erfolgreich erstellt!
                     </div>
                 )}
@@ -106,7 +107,7 @@ export default function NewCoach({ onBack, onSuccess, hideHeader }: NewCoachProp
                 <button
                     type="submit"
                     disabled={loading || !name.trim()}
-                    className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-sm min-h-[48px] text-base"
                 >
                     {loading ? (
                         <>

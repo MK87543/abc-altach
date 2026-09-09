@@ -13,12 +13,14 @@ import Statistics from './Statistics'
 import ManageNew from './ManageNew'
 import ManageEdit from './ManageEdit'
 import CoachCalendar from './CoachCalendar'
+import VereinHub from './VereinHub'
 import { CheckIcon, ClipboardIcon, CalendarIcon, EditIcon, LogoutIcon, DownloadIcon, ChartIcon, PlusIcon, UserIcon, UmbrellaIcon } from '../components/Icons'
 
-type View = 'attendance' | 'history' | 'planner' | 'statistics' | 'verwaltung' | 'manageNew' | 'manageEdit' | 'export' | 'coachCalendar'
+type View = 'attendance' | 'history' | 'planner' | 'statistics' | 'verwaltung' | 'manageNew' | 'manageEdit' | 'export' | 'coachCalendar' | 'verein'
 
 export default function Dashboard() {
     const [currentView, setCurrentView] = useUrlQueryParam<View>('view', 'attendance')
+    const navMode: '3pillar' | 'classic' = '3pillar'
     const { activeCoachId, setActiveCoach } = useActiveCoach()
     const [coaches, setCoaches] = useState<Coach[]>([])
     const { confirm } = useConfirm()
@@ -53,45 +55,57 @@ export default function Dashboard() {
         setCurrentView(view)
     }
 
-
-    // Die 5 Haupt-Tabs für die untere Navigationsleiste
-    const mainTabs: { view: View; label: string; icon: ReactElement }[] = [
-        { view: 'attendance', label: 'Heute', icon: <CheckIcon size={22} /> },
-        { view: 'history', label: 'Historie', icon: <ClipboardIcon size={22} /> },
-        { view: 'planner', label: 'Planung', icon: <CalendarIcon size={22} /> },
-        { view: 'statistics', label: 'Statistik', icon: <ChartIcon size={22} /> },
-        { view: 'verwaltung', label: 'Verwaltung', icon: <EditIcon size={22} /> },
+    // ── 3-Säulen-Navigation (Neu) vs. 5-Tab-Navigation (Klassisch) ──
+    const threePillarTabs: { view: View; label: string; icon: ReactElement }[] = [
+        { view: 'attendance', label: 'Heute', icon: <CheckIcon size={20} /> },
+        { view: 'planner', label: 'Termine', icon: <CalendarIcon size={20} /> },
+        { view: 'verein', label: 'Verein', icon: <UserIcon size={20} /> },
     ]
 
-    // Welcher Tab ist aktiv? (Unterseiten von Verwaltung zählen auch als "Verwaltung")
-    const activeTab: View = (['manageNew', 'manageEdit', 'export', 'coachCalendar'] as View[]).includes(currentView)
-        ? 'verwaltung'
-        : currentView
+    const classicTabs: { view: View; label: string; icon: ReactElement }[] = [
+        { view: 'attendance', label: 'Heute', icon: <CheckIcon size={20} /> },
+        { view: 'history', label: 'Historie', icon: <ClipboardIcon size={20} /> },
+        { view: 'planner', label: 'Planung', icon: <CalendarIcon size={20} /> },
+        { view: 'statistics', label: 'Statistik', icon: <ChartIcon size={20} /> },
+        { view: 'verwaltung', label: 'Verwaltung', icon: <EditIcon size={20} /> },
+    ]
+
+    const currentTabs = navMode === '3pillar' ? threePillarTabs : classicTabs
+
+    // Welcher Tab ist aktiv?
+    const activeTab: View = navMode === '3pillar'
+        ? (['verein', 'verwaltung', 'manageNew', 'manageEdit', 'export', 'history', 'statistics'].includes(currentView)
+            ? 'verein'
+            : (currentView === 'coachCalendar' ? 'planner' : currentView))
+        : ((['manageNew', 'manageEdit', 'export', 'coachCalendar'] as View[]).includes(currentView)
+            ? 'verwaltung'
+            : currentView)
 
     // Aktuellen Seitentitel bestimmen
     const pageTitle: Record<View, string> = {
         attendance: 'Anwesenheit erfassen',
         history: 'Trainings-Historie',
-        planner: 'Trainings planen',
+        planner: navMode === '3pillar' ? 'Termine & Planung' : 'Trainings planen',
         statistics: 'Statistik',
         verwaltung: 'Verwaltung',
         manageNew: 'Neu hinzufügen',
         manageEdit: 'Bearbeiten',
         export: 'Excel Export',
         coachCalendar: 'Trainer-Abwesenheitskalender',
+        verein: 'Vereinsverwaltung',
     }
 
     return (
         <div className="min-h-screen flex flex-col">
             {/* ── Fixer Header oben ── */}
             <header className="bg-white shadow-sm sticky top-0 z-50">
-                <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+                <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
                     <div>
                         <p className="text-xs text-gray-400 uppercase tracking-wide font-medium leading-none">ABC Altach</p>
-                        <h1 className="text-lg font-bold text-gray-800 leading-tight">{pageTitle[currentView]}</h1>
+                        <h1 className="text-lg font-bold text-gray-800 leading-tight">{pageTitle[currentView] || 'ABC Altach'}</h1>
                     </div>
                     
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
                         {/* Aktiver Trainer (im Cookie gespeichert) */}
                         {coaches.length > 0 && (
                             <div className="hidden sm:flex items-center gap-1.5 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg text-xs" title="Aktiver Trainer (wird im Cookie gespeichert)">
@@ -112,58 +126,83 @@ export default function Dashboard() {
 
                         <button
                             onClick={handleLogout}
-                            className="flex items-center gap-2 text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition text-sm font-medium"
+                            className="flex items-center gap-1.5 text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-2.5 sm:px-3 py-1.5 rounded-lg transition text-xs sm:text-sm font-medium cursor-pointer"
                         >
                             <LogoutIcon size={16} />
-                            Abmelden
+                            <span className="hidden xs:inline">Abmelden</span>
                         </button>
                     </div>
                 </div>
             </header>
 
             {/* ── Hauptinhalt ── */}
-            <main className="flex-1 pb-24">
-                {currentView === 'attendance' && (
-                    <NewAttendance />
-                )}
-                {currentView === 'history' && (
-                    <AttendanceHistory />
-                )}
-                {currentView === 'planner' && (
-                    <TrainingPlanner onOpenCalendar={() => navigateTo('coachCalendar')} />
-                )}
-                {currentView === 'statistics' && (
-                    <Statistics />
-                )}
-                {currentView === 'verwaltung' && (
-                    <VerwaltungHub
-                        onNavigate={navigateTo}
-                    />
-                )}
-                {currentView === 'manageNew' && (
-                    <ManageNew onBack={() => navigateTo('verwaltung')} />
-                )}
-                {currentView === 'manageEdit' && (
-                    <ManageEdit onBack={() => navigateTo('verwaltung')} />
-                )}
-                {currentView === 'export' && (
-                    <ExportAttendance onBack={() => navigateTo('verwaltung')} />
-                )}
-                {currentView === 'coachCalendar' && (
-                    <CoachCalendar onBack={() => navigateTo('verwaltung')} />
+            <main className="flex-1 pb-20 sm:pb-24">
+                {navMode === '3pillar' ? (
+                    <>
+                        {currentView === 'attendance' && (
+                            <NewAttendance />
+                        )}
+                        {currentView === 'planner' && (
+                            <TrainingPlanner
+                                hideHeader={true}
+                                onOpenCalendar={() => navigateTo('coachCalendar')}
+                            />
+                        )}
+                        {currentView === 'coachCalendar' && (
+                            <CoachCalendar
+                                onBack={() => navigateTo('planner')}
+                                hideHeader={true}
+                            />
+                        )}
+                        {((['verein', 'verwaltung', 'history', 'statistics', 'export', 'manageNew', 'manageEdit'] as View[]).includes(currentView)) && (
+                            <VereinHub />
+                        )}
+                    </>
+                ) : (
+                    <>
+                        {currentView === 'attendance' && (
+                            <NewAttendance />
+                        )}
+                        {currentView === 'history' && (
+                            <AttendanceHistory />
+                        )}
+                        {currentView === 'planner' && (
+                            <TrainingPlanner onOpenCalendar={() => navigateTo('coachCalendar')} />
+                        )}
+                        {currentView === 'statistics' && (
+                            <Statistics />
+                        )}
+                        {currentView === 'verwaltung' && (
+                            <VerwaltungHub
+                                onNavigate={navigateTo}
+                            />
+                        )}
+                        {currentView === 'manageNew' && (
+                            <ManageNew onBack={() => navigateTo('verwaltung')} />
+                        )}
+                        {currentView === 'manageEdit' && (
+                            <ManageEdit onBack={() => navigateTo('verwaltung')} />
+                        )}
+                        {currentView === 'export' && (
+                            <ExportAttendance onBack={() => navigateTo('verwaltung')} />
+                        )}
+                        {currentView === 'coachCalendar' && (
+                            <CoachCalendar onBack={() => navigateTo('verwaltung')} />
+                        )}
+                    </>
                 )}
             </main>
 
-            {/* ── Fixe untere Tab-Leiste ── */}
-            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+            {/* ── Fixe untere Tab-Leiste (schlank & kompakt) ── */}
+            <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-md z-50 safe-bottom-nav">
                 <div className="max-w-4xl mx-auto flex">
-                    {mainTabs.map((tab) => {
+                    {currentTabs.map((tab) => {
                         const isActive = activeTab === tab.view
                         return (
                             <button
                                 key={tab.view}
                                 onClick={() => navigateTo(tab.view)}
-                                className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${isActive
+                                className={`flex-1 flex flex-col items-center justify-center py-1.5 sm:py-2 gap-0.5 transition-colors cursor-pointer relative min-h-[48px] sm:min-h-[50px] ${isActive
                                         ? 'text-blue-600'
                                         : 'text-gray-400 hover:text-gray-600'
                                     }`}
@@ -171,11 +210,11 @@ export default function Dashboard() {
                                 <span className={`p-1 rounded-lg transition-colors ${isActive ? 'bg-blue-50' : ''}`}>
                                     {tab.icon}
                                 </span>
-                                <span className={`text-xs font-medium ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                                <span className={`text-[11px] sm:text-xs font-medium leading-tight ${isActive ? 'text-blue-600 font-bold' : 'text-gray-500'}`}>
                                     {tab.label}
                                 </span>
                                 {isActive && (
-                                    <span className="absolute bottom-0 h-0.5 w-8 bg-blue-600 rounded-t-full" />
+                                    <span className="absolute bottom-0 h-[2.5px] w-8 bg-blue-600 rounded-t-full" />
                                 )}
                             </button>
                         )
@@ -229,7 +268,6 @@ function VerwaltungHub({ onNavigate }: VerwaltungHubProps) {
 
     return (
         <div className="p-4 md:p-8 max-w-2xl mx-auto">
-            <p className="text-gray-500 text-sm mb-6">Wähle eine Aktion aus:</p>
             <div className="flex flex-col gap-4">
                 {cards.map((card) => (
                     <button

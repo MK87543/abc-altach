@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { ChartIcon, SpinnerIcon } from '../components/Icons'
+import { ChartIcon, SpinnerIcon, ChevronLeftIcon } from '../components/Icons'
 import { useUrlQueryParam } from '../lib/urlUtils'
 import { useToast } from '../components/Toast'
 
@@ -176,49 +176,50 @@ export default function Statistics({ onBack }: StatisticsProps) {
     }
 
     return (
-        <div className="p-2 md:p-6 max-w-4xl mx-auto">
-            <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-4 mb-4">
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-5 mb-4">
                 <div className="flex justify-between items-center">
-                    <h1 className="text-xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
-                        <ChartIcon size={24} className="md:w-8 md:h-8" />
+                    <h1 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
+                        <ChartIcon size={24} />
                         Statistik
                     </h1>
                     {onBack && (
                         <button
                             onClick={onBack}
-                            className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 text-sm rounded-lg transition"
+                            className="flex items-center gap-1.5 text-slate-600 hover:text-slate-800 px-3 py-2 rounded-xl transition text-sm font-medium cursor-pointer hover:bg-slate-100 min-h-[44px]"
                         >
+                            <ChevronLeftIcon size={18} />
                             Zurück
                         </button>
                     )}
                 </div>
 
                 {/* Date Filter */}
-                <div className="mt-4 flex flex-col sm:flex-row items-end gap-2 bg-gray-50 rounded-lg border border-gray-200 p-3">
-                    <div className="w-full sm:flex-1 grid grid-cols-2 gap-2">
+                <div className="mt-4 flex flex-col sm:flex-row items-end gap-2 bg-gray-50 rounded-xl border border-gray-200 p-4">
+                    <div className="w-full sm:flex-1 grid grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Von</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Von</label>
                             <input
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Bis</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Bis</label>
                             <input
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto">
                         <button
                             onClick={() => loadData()}
-                            className="flex-1 sm:flex-none px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition"
+                            className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 transition min-h-[44px] cursor-pointer font-medium"
                         >
                             Filter
                         </button>
@@ -228,7 +229,7 @@ export default function Statistics({ onBack }: StatisticsProps) {
                                     setStartDate('')
                                     setEndDate('')
                                 }}
-                                className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 transition"
+                                className="px-4 py-2.5 bg-gray-200 text-gray-700 rounded-xl text-sm hover:bg-gray-300 transition min-h-[44px] cursor-pointer font-medium"
                             >
                                 Reset
                             </button>
@@ -241,12 +242,12 @@ export default function Statistics({ onBack }: StatisticsProps) {
                 </p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md overflow-hidden">
                 {/* Tab Switcher */}
                 <div className="flex border-b border-gray-200">
                     <button
                         onClick={() => setActiveTab('player')}
-                        className={`flex-1 py-3 text-sm font-semibold transition ${activeTab === 'player'
+                        className={`flex-1 py-3.5 text-base font-semibold transition min-h-[48px] cursor-pointer ${activeTab === 'player'
                                 ? 'bg-white text-blue-600 border-b-2 border-blue-600'
                                 : 'text-gray-500 hover:text-gray-700 bg-gray-50'
                             }`}
@@ -255,7 +256,7 @@ export default function Statistics({ onBack }: StatisticsProps) {
                     </button>
                     <button
                         onClick={() => setActiveTab('coach')}
-                        className={`flex-1 py-3 text-sm font-semibold transition ${activeTab === 'coach'
+                        className={`flex-1 py-3.5 text-base font-semibold transition min-h-[48px] cursor-pointer ${activeTab === 'coach'
                                 ? 'bg-white text-blue-600 border-b-2 border-blue-600'
                                 : 'text-gray-500 hover:text-gray-700 bg-gray-50'
                             }`}
@@ -277,18 +278,18 @@ export default function Statistics({ onBack }: StatisticsProps) {
                             <table className="w-full text-left border-collapse text-sm">
                                 <thead>
                                     <tr className="bg-gray-100 border-b border-gray-200">
-                                        <th className="p-2 font-bold text-gray-700 text-center w-8">#</th>
-                                        <th className="p-2 font-bold text-gray-700">Name</th>
-                                        <th className="p-2 font-bold text-gray-700 text-center w-12">Anz.</th>
-                                        <th className="p-2 font-bold text-gray-700 text-right">Quote</th>
+                                        <th className="p-3 font-bold text-gray-700 text-center w-8">#</th>
+                                        <th className="p-3 font-bold text-gray-700">Name</th>
+                                        <th className="p-3 font-bold text-gray-700 text-center w-12">Anz.</th>
+                                        <th className="p-3 font-bold text-gray-700 text-right">Quote</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {stats.map((player, index) => (
                                         <tr key={player.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                                            <td className="p-2 text-gray-500 text-center text-xs">#{index + 1}</td>
-                                            <td className="p-2 font-medium text-gray-800 truncate max-w-25 sm:max-w-none">{player.name}</td>
-                                            <td className="p-2 text-center">
+                                            <td className="p-3 text-gray-500 text-center text-xs">#{index + 1}</td>
+                                            <td className="p-3 font-medium text-gray-800 truncate max-w-25 sm:max-w-none text-base">{player.name}</td>
+                                            <td className="p-3 text-center">
                                                 <span className="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold text-xs">
                                                     {player.attendanceCount}
                                                 </span>

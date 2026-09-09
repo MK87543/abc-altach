@@ -265,15 +265,15 @@ export default function SeasonPlanner({
     return (
         <div className="space-y-4">
             {/* ── 1. Kompakte Konfiguration ── */}
-            <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 space-y-4">
+            <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 sm:p-5 space-y-4">
                 {/* Wochentag & Dauer */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                     {/* Wochentag */}
                     <div className="sm:col-span-5">
-                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
                             Wochentag
                         </label>
-                        <div className="flex gap-1">
+                        <div className="grid grid-cols-7 gap-1">
                             {WEEKDAY_ORDER.map(dayIdx => {
                                 const isSelected = selectedWeekday === dayIdx
                                 return (
@@ -281,7 +281,7 @@ export default function SeasonPlanner({
                                         key={dayIdx}
                                         type="button"
                                         onClick={() => handleWeekdayChange(dayIdx)}
-                                        className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer text-center ${
+                                        className={`py-2 px-0.5 text-[11px] sm:text-xs font-bold rounded-xl transition cursor-pointer text-center min-h-[42px] sm:min-h-[44px] flex items-center justify-center ${
                                             isSelected
                                                 ? 'bg-blue-600 text-white shadow-xs'
                                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -296,31 +296,31 @@ export default function SeasonPlanner({
 
                     {/* Startdatum */}
                     <div className="sm:col-span-3">
-                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
                             Startdatum
                         </label>
                         <input
                             type="date"
                             value={startDate}
                             onChange={(e) => handleStartDateChange(e.target.value)}
-                            className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                            className="w-full px-3 py-2.5 text-base bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium min-h-[42px] sm:min-h-[44px]"
                         />
                     </div>
 
                     {/* Wochenanzahl */}
                     <div className="sm:col-span-4">
                         <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-xs font-bold text-slate-700">
+                            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                                 Dauer ({weeksCount} Wochen)
                             </label>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="grid grid-cols-5 gap-1">
                             {[4, 8, 12, 16, 20].map(w => (
                                 <button
                                     key={w}
                                     type="button"
                                     onClick={() => setWeeksCount(w)}
-                                    className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer text-center ${
+                                    className={`py-2 text-xs font-semibold rounded-xl border transition cursor-pointer text-center min-h-[42px] sm:min-h-[44px] flex items-center justify-center ${
                                         weeksCount === w
                                             ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold'
                                             : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -336,13 +336,13 @@ export default function SeasonPlanner({
                 {/* Standard für alle Termine: Beschreibung & 2 Trainer */}
                 <div className="pt-3 border-t border-slate-100">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-slate-700">
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                             Standard für alle Termine
                         </span>
                         <button
                             type="button"
                             onClick={applyDefaultsToAll}
-                            className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                            className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer py-1"
                         >
                             Auf alle Termine anwenden
                         </button>
@@ -356,7 +356,7 @@ export default function SeasonPlanner({
                                 value={defaultDescription}
                                 onChange={(e) => setDefaultDescription(e.target.value)}
                                 placeholder="Beschreibung (z.B. Reguläres Training)"
-                                className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-3 py-2.5 text-base bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                             />
                         </div>
 
@@ -365,7 +365,7 @@ export default function SeasonPlanner({
                             <select
                                 value={defaultCoach1}
                                 onChange={(e) => setDefaultCoach1(e.target.value)}
-                                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-3 py-2.5 text-base bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                             >
                                 <option value="">-- Standard Trainer 1 --</option>
                                 {coaches.map(c => (
@@ -381,7 +381,7 @@ export default function SeasonPlanner({
                             <select
                                 value={defaultCoach2}
                                 onChange={(e) => setDefaultCoach2(e.target.value)}
-                                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="w-full px-3 py-2.5 text-base bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
                             >
                                 <option value="">-- Standard Trainer 2 --</option>
                                 {coaches.map(c => (
@@ -451,13 +451,13 @@ export default function SeasonPlanner({
                                             type="checkbox"
                                             checked={row.selected}
                                             onChange={() => toggleRowSelected(idx)}
-                                            className="w-4 h-4 rounded text-blue-600 cursor-pointer shrink-0"
+                                            className="w-5 h-5 rounded text-blue-600 cursor-pointer shrink-0"
                                         />
-                                        <span className={`text-xs font-bold shrink-0 ${row.selected ? 'text-slate-900' : 'text-slate-400'}`}>
+                                        <span className={`text-xs sm:text-sm font-bold shrink-0 ${row.selected ? 'text-slate-900' : 'text-slate-400'}`}>
                                             {weekdayStr}, {formatDateShortGerman(row.date)}
                                         </span>
                                         {isAlreadyInDb && (
-                                            <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-medium shrink-0">
+                                            <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium shrink-0">
                                                 bereits in DB
                                             </span>
                                         )}
@@ -471,7 +471,7 @@ export default function SeasonPlanner({
                                             disabled={!row.selected}
                                             onChange={(e) => updateRowDescription(idx, e.target.value)}
                                             placeholder="Beschreibung..."
-                                            className="w-full px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                                            className="w-full px-2.5 py-2 text-base sm:text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 min-h-[40px]"
                                         />
                                     </div>
 
@@ -482,7 +482,7 @@ export default function SeasonPlanner({
                                             value={row.coach1}
                                             disabled={!row.selected}
                                             onChange={(e) => updateRowCoach1(idx, e.target.value)}
-                                            className={`w-full px-2 py-1 text-xs rounded-lg border focus:outline-none disabled:opacity-50 ${
+                                            className={`w-full px-2 py-2 text-base sm:text-xs rounded-lg border focus:outline-none disabled:opacity-50 min-h-[40px] ${
                                                 coach1Absence
                                                     ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold'
                                                     : 'bg-slate-50 border-slate-200 text-slate-800'
@@ -504,7 +504,7 @@ export default function SeasonPlanner({
                                             value={row.coach2}
                                             disabled={!row.selected}
                                             onChange={(e) => updateRowCoach2(idx, e.target.value)}
-                                            className={`w-full px-2 py-1 text-xs rounded-lg border focus:outline-none disabled:opacity-50 ${
+                                            className={`w-full px-2 py-2 text-base sm:text-xs rounded-lg border focus:outline-none disabled:opacity-50 min-h-[40px] ${
                                                 coach2Absence
                                                     ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold'
                                                     : 'bg-slate-50 border-slate-200 text-slate-800'
@@ -541,7 +541,7 @@ export default function SeasonPlanner({
 
                 {/* ── Speichern-Button ── */}
                 <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <span className="text-xs text-slate-600">
+                    <span className="text-xs sm:text-sm text-slate-600">
                         {selectedCount > 0 ? (
                             <>Es werden <strong>{selectedCount} Trainings</strong> erstellt.</>
                         ) : (
@@ -553,16 +553,16 @@ export default function SeasonPlanner({
                         type="button"
                         onClick={handleSave}
                         disabled={saving || selectedCount === 0}
-                        className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                        className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-base rounded-xl transition shadow-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
                     >
                         {saving ? (
                             <>
-                                <SpinnerIcon size={16} />
+                                <SpinnerIcon size={18} />
                                 <span>Erstelle Trainings...</span>
                             </>
                         ) : (
                             <>
-                                <CheckIcon size={16} />
+                                <CheckIcon size={18} />
                                 <span>{selectedCount} Trainings jetzt planen</span>
                             </>
                         )}

@@ -16,3 +16,16 @@ body {
   background-size: cover;
   background-color: #f3f4f6;
 }
+
+/* iOS Auto-Zoom Schutz: Nur Formularelemente.
+   iOS zoomt automatisch rein wenn font-size < 16px auf Inputs. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+/* Safe-Area Bottom für fixierte Bottom-Navigation */
+.safe-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

@@ -4,7 +4,7 @@ import * as ExcelJS from 'exceljs'
 import type { Attendance, Coach, CoachAttendance, Player, Training } from '../types/interfaces'
 import { useToast } from '../components/Toast'
 import { useUrlQueryParam } from '../lib/urlUtils'
-import { SpinnerIcon } from '../components/Icons'
+import { SpinnerIcon, ChevronLeftIcon } from '../components/Icons'
 
 interface ExportAttendanceProps {
     onBack?: () => void
@@ -207,16 +207,17 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
     }
 
     return (
-        <div className="p-6 max-w-3xl mx-auto">
+        <div className="p-4 sm:p-6 max-w-3xl mx-auto">
             {/* Header */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6 mb-6">
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-5 mb-5">
                 <div className="flex justify-between items-center">
-                    <h1 className="text-3xl font-bold text-gray-800">Anwesenheit exportieren</h1>
+                    <h1 className="text-2xl font-bold text-gray-800">Anwesenheit exportieren</h1>
                     {onBack && (
                         <button
                             onClick={onBack}
-                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition"
+                            className="flex items-center gap-1.5 text-slate-600 hover:text-slate-800 px-3 py-2 rounded-xl transition text-sm font-medium cursor-pointer hover:bg-slate-100 min-h-[44px]"
                         >
+                            <ChevronLeftIcon size={18} />
                             Zurück
                         </button>
                     )}
@@ -224,7 +225,7 @@ export default function ExportAttendance({ onBack }: ExportAttendanceProps) {
             </div>
 
             {/* Export Form */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-md p-6">
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-5">
                 <div className="space-y-4 mb-6">
                     <div>
                         <label className="block text-gray-700 font-medium mb-2">
